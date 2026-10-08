@@ -1,14 +1,17 @@
+import {ClockPicker} from './TimeField';
+import {formatTime} from './time.cjs';
 import React,{useState} from 'react';
 import {View,Text,Pressable} from 'react-native';
 import {Sheet,Btn,Icon,C,s} from './ui';
 import {today,validDate} from './domain.cjs';
 const pad=(n:number)=>String(n).padStart(2,'0');
-export function DateField({label,value,onChangeText}:{label:string;value:string;onChangeText:(value:string)=>void}){
+export function DateField({label,value,onChangeText,time,onTimeChange}:{label:string;value:string;onChangeText:(value:string)=>void;time?:string;onTimeChange?:(value:string)=>void}){
+ const [timeOpen,setTimeOpen]=useState(false);
  const [open,setOpen]=useState(false);const [month,setMonth]=useState(new Date());const [draft,setDraft]=useState(value);
  function show(){const date=validDate(value)?value:today();const [y,m,d]=date.split('-').map(Number);setMonth(new Date(y,m-1,1));setDraft(date);setOpen(true);}
  const y=month.getFullYear(),m=month.getMonth();const offset=(new Date(y,m,1).getDay()+6)%7;const days=new Date(y,m+1,0).getDate();
  function move(months:number){const next=new Date(y,m+months,1);if(next.getFullYear()>=1900&&next.getFullYear()<=2100)setMonth(next);}
- return <View style={{marginBottom:14}}><Text style={s.label}>{label}</Text><Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${value}. Choose date`} onPress={show} style={[s.input,s.row]}><Text style={s.text}>{value}</Text><Icon name="calendar" color={C.teal}/></Pressable>
+ return <View style={{marginBottom:14}}><Text style={s.label}>{label}</Text><View style={[s.input,{flexDirection:'row',padding:0,alignItems:'center'}]}><Pressable accessibilityRole="button" accessibilityLabel={`Date: ${value}. Choose date`} onPress={show} style={{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:12,gap:4,minHeight:52}}><Icon name="calendar" size={18} color={C.teal}/><Text numberOfLines={1} adjustsFontSizeToFit style={[s.text,{fontSize:14}]}>{value}</Text></Pressable>{onTimeChange&&<><View style={{height:30,width:1,backgroundColor:C.line}}/><Pressable accessibilityRole="button" accessibilityLabel={`Time: ${formatTime(time||'')}. Choose time`} onPress={()=>setTimeOpen(true)} style={{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:12,gap:4,minHeight:52}}><Icon name="clock" size={18} color={C.teal}/><Text numberOfLines={1} adjustsFontSizeToFit style={[s.text,{fontSize:14}]}>{formatTime(time||'')}</Text></Pressable></>}</View>{onTimeChange&&<ClockPicker visible={timeOpen} value={time||''} onChange={onTimeChange} onClose={()=>setTimeOpen(false)}/>}
  <Sheet visible={open} title="Choose date" onClose={()=>setOpen(false)}><View style={[s.row,{marginBottom:16}]}><Pressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={()=>move(-1)} style={s.chip}><Icon name="back"/></Pressable><Text style={s.section}>{month.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</Text><Pressable accessibilityRole="button" accessibilityLabel="Next month" onPress={()=>move(1)} style={s.chip}><Icon name="next"/></Pressable></View>
  <View style={s.row}><Btn title="Previous year" secondary onPress={()=>move(-12)}/><Btn title="Next year" secondary onPress={()=>move(12)}/></View>
  <View style={{flexDirection:'row'}}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=><Text key={day} style={[s.muted,{width:'14.2857%',textAlign:'center',paddingVertical:12}]}>{day}</Text>)}</View>

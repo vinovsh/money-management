@@ -2,6 +2,12 @@
 
 Offline-first personal finance app built with **React Native CLI + TypeScript**, targeting Android first. The UI follows the approved Moneywise mobile concept.
 
+## Version 0.3.1
+
+- One Date & time field: date on the left, 12-hour AM/PM time on the right.
+- Alarm-style round clock picker for hours and minutes, with draggable hand and exact-minute adjustment.
+- New transaction forms initialize to the current local time each time they open; existing timestamps are preserved.
+
 ## Version 0.3.0
 
 - Approved blue Wallet M launcher logo and blue default accent.
