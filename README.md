@@ -2,6 +2,17 @@
 
 Offline-first personal finance app built with **React Native CLI + TypeScript**, targeting Android first. The UI follows the approved Moneywise mobile concept.
 
+## Version 0.3.0
+
+- Approved blue Wallet M launcher logo and blue default accent.
+- Appearance is a separate More option.
+- Calendar fits seven columns with slide gestures and arrow navigation. Daily values use K/M abbreviations; selected-day totals remain exact.
+- Cash, Card and Account payment options are added without altering existing balances.
+- Hold and drag category cards to save their order; use the final + card to add one. Edit categories under More.
+- Spaced date picker and 24-hour transaction time picker. Older records keep their original date without an invented time.
+- More icons opens from the three-dot icon button.
+- Modal scrolling supports nested scrolling and keyboard dismissal.
+
 ## Version 0.2.0
 
 - Tap a date to open a calendar modal (transactions and custom report ranges). Choose a day and tap **Use selected date**.

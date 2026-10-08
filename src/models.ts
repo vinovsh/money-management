@@ -1,7 +1,7 @@
 export type TxType = 'expense'|'income'|'refund'|'transfer';
 export type Account = {id:string; name:string; type:string; opening:number; archived:boolean};
-export type Category = {id:string; name:string; icon:string; color:string; type:'expense'|'income'};
-export type Transaction = {id:string; type:TxType; amount:number; date:string; accountId:string; destinationId:string; categoryId:string; note:string; tags:string; createdAt:string; updatedAt:string; deletedAt:string|null};
+export type Category = {id:string; name:string; icon:string; color:string; type:'expense'|'income'; order?:number};
+export type Transaction = {id:string; type:TxType; amount:number; date:string; time?:string; accountId:string; destinationId:string; categoryId:string; note:string; tags:string; createdAt:string; updatedAt:string; deletedAt:string|null};
 export type Budget = {id:string; name:string; amount:number; categoryId:string};
 export type Journal = {id:string; date:string; body:string};
 export type Goal = {id:string; name:string; target:number; saved:number};

@@ -40,7 +40,7 @@ function monthBounds(value=today()) {
 function dayCount(from,to) {return Math.round((Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000)+1;}
 function filterTransactions(txs,f={}) {
   const search=(f.search||'').toLowerCase().trim();
-  return txs.filter(t=>!t.deletedAt && (!f.from||t.date>=f.from) && (!f.to||t.date<=f.to) && (!f.type||t.type===f.type) && (!f.accountId||t.accountId===f.accountId||t.destinationId===f.accountId) && (!f.categoryId||t.categoryId===f.categoryId) && (!search||`${t.note||''} ${t.categoryId} ${t.tags||''}`.toLowerCase().includes(search)) && (f.min===undefined||t.amount>=f.min) && (f.max===undefined||t.amount<=f.max)).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+  return txs.filter(t=>!t.deletedAt && (!f.from||t.date>=f.from) && (!f.to||t.date<=f.to) && (!f.type||t.type===f.type) && (!f.accountId||t.accountId===f.accountId||t.destinationId===f.accountId) && (!f.categoryId||t.categoryId===f.categoryId) && (!search||`${t.note||''} ${t.categoryId} ${t.tags||''}`.toLowerCase().includes(search)) && (f.min===undefined||t.amount>=f.min) && (f.max===undefined||t.amount<=f.max)).sort((a,b)=>b.date.localeCompare(a.date)||(b.time||'').localeCompare(a.time||'')||b.createdAt.localeCompare(a.createdAt));
 }
 function summary(txs) {
   let expenses=0,income=0,refunds=0;
@@ -59,6 +59,7 @@ function categoryTotals(txs) {
 function validateTransaction(t,accounts,categories) {
   if(!t.id||!['expense','income','refund','transfer'].includes(t.type))throw new Error('Invalid transaction type.');
   if(!Number.isSafeInteger(t.amount)||t.amount<=0)throw new Error('Invalid transaction amount.');
+  if(t.time!==undefined&&(typeof t.time!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t.time)))throw new Error('Choose a valid transaction time.');
   if(!validDate(t.date))throw new Error('Choose a valid date (YYYY-MM-DD).');
   if(!accounts.some(a=>a.id===t.accountId))throw new Error('Choose an account.');
   if(t.type==='transfer') {
@@ -83,7 +84,7 @@ function validateSnapshot(s) {
   if(d.settings.theme!==undefined&&!['light','dark'].includes(d.settings.theme))throw new Error('Invalid backup theme.');
   if(d.settings.primaryColor!==undefined&&(typeof d.settings.primaryColor!=='string'||!/^#[0-9a-f]{6}$/i.test(d.settings.primaryColor)))throw new Error('Invalid backup primary color.');
   for(const a of d.accounts){if(typeof a.name!=='string'||a.name.length>80||!Number.isSafeInteger(a.opening)||typeof a.archived!=='boolean')throw new Error('Invalid backup account.');}
-  for(const c of d.categories){if(typeof c.name!=='string'||!['income','expense'].includes(c.type)||typeof c.color!=='string'||!/^#[0-9a-f]{6}$/i.test(c.color)||typeof c.icon!=='string')throw new Error('Invalid backup category.');}
+  for(const c of d.categories){if(c.order!==undefined&&(!Number.isSafeInteger(c.order)||c.order<0))throw new Error('Invalid category order.');if(typeof c.name!=='string'||!['income','expense'].includes(c.type)||typeof c.color!=='string'||!/^#[0-9a-f]{6}$/i.test(c.color)||typeof c.icon!=='string')throw new Error('Invalid backup category.');}
   for(const t of d.transactions){validateTransaction(t,d.accounts,d.categories);if(typeof t.createdAt!=='string'||typeof t.updatedAt!=='string')throw new Error('Invalid transaction metadata.');}
   for(const b of d.budgets){if(!Number.isSafeInteger(b.amount)||b.amount<=0||typeof b.name!=='string'||(b.categoryId&&!d.categories.some(c=>c.id===b.categoryId&&c.type==='expense')))throw new Error('Invalid backup budget.');}
   for(const n of d.notes){if(!validDate(n.date)||typeof n.body!=='string'||n.body.length>2000)throw new Error('Invalid journal entry.');}
@@ -91,3 +92,12 @@ function validateSnapshot(s) {
   return s;
 }
 module.exports={CATEGORY_SEEDS,today,validDate,moneyToMinor,signedMoneyToMinor,minorToInput,formatMoney,monthBounds,dayCount,filterTransactions,summary,accountBalance,categoryTotals,validateTransaction,validateSnapshot};
+
+function reorderCategories(categories,ids){
+ if(ids.length!==new Set(ids).size||ids.some(id=>!categories.some(c=>c.id===id)))throw new Error('Invalid category order.');
+ const selected=categories.filter(c=>ids.includes(c.id));
+ if(selected.length&&selected.some(c=>c.type!==selected[0].type))throw new Error('Reorder one category type at a time.');
+ if(selected.length&&categories.filter(c=>c.type===selected[0].type).length!==ids.length)throw new Error('Include every category of this type.');
+ return categories.map(c=>ids.includes(c.id)?{...c,order:ids.indexOf(c.id)}:c);
+}
+module.exports.reorderCategories=reorderCategories;

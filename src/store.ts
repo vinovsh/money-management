@@ -1,5 +1,5 @@
 import type {Ledger,Snapshot,Transaction,Account,Budget,Journal,Goal,Settings,Category} from './models';
-import {CATEGORY_SEEDS, validateTransaction, validateSnapshot} from './domain.cjs';
+import {CATEGORY_SEEDS, validateTransaction, validateSnapshot, reorderCategories} from './domain.cjs';
 const SQLite = require('react-native-sqlite-storage');
 let database:any;
 export function id():string{return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,12)}-${Math.random().toString(36).slice(2,8)}`;}
@@ -21,6 +21,11 @@ export async function openStore():Promise<void>{
  const defaults:Settings={currency:'USD',name:'Friend',onboarding:false,lastBackup:'',datasetId:id()};
  await atomic([{sql:"INSERT INTO metadata VALUES ('schema','1')"},{sql:"INSERT INTO metadata VALUES ('settings',?)",args:[JSON.stringify(defaults)]},insert('accounts',{id:'cash',name:'Cash',type:'Cash',opening:0,archived:false}),...CATEGORY_SEEDS.map(c=>insert('categories',c))]);
  }
+ const storedAccounts=await read('SELECT payload FROM accounts');
+ const accounts=storedAccounts.map(a=>JSON.parse(a.payload));
+ const defaults=[{id:'cash-default',name:'Cash',type:'Cash',opening:0,archived:false},{id:'card-default',name:'Card',type:'Card',opening:0,archived:false},{id:'bank-default',name:'Account',type:'Bank',opening:0,archived:false}];
+ const missing=defaults.filter(a=>!accounts.some(item=>!item.archived&&item.type===a.type));
+ if(missing.length)await atomic(missing.map(a=>insert('accounts',{...a,id:accounts.some(item=>item.id===a.id)?id():a.id})));
 }
 // All tables are read inside one SQLite transaction for a consistent snapshot.
 export function loadLedger():Promise<Ledger>{
@@ -55,5 +60,7 @@ export async function saveCategory(c:Category,ledger:Ledger){
  const existing=ledger.categories.find(item=>item.id===c.id);
  if(existing&&existing.type!==c.type)throw new Error('An existing category must keep its transaction type.');
  if(ledger.categories.some(item=>item.id!==c.id&&item.type===c.type&&item.name.toLocaleLowerCase()===name.toLocaleLowerCase()))throw new Error('This category name already exists.');
- await atomic([insert('categories',{...c,name})]);
+ await atomic([insert('categories',{...c,name,order:existing?.order??c.order??Math.max(-1,...ledger.categories.filter(item=>item.type===c.type).map(item=>item.order??ledger.categories.indexOf(item)))+1})]);
 }
+
+export async function saveCategoryOrder(ids:string[],ledger:Ledger){await atomic(reorderCategories(ledger.categories,ids).filter(c=>ids.includes(c.id)).map(c=>insert('categories',c)));}

@@ -14,3 +14,5 @@ export function accountBalance(account:Account,txs:Transaction[]):number;
 export function categoryTotals(txs:Transaction[]):{id:string;amount:number}[];
 export function validateTransaction(t:Transaction,accounts:Account[],categories:Category[]):void;
 export function validateSnapshot(s:unknown):Snapshot;
+
+export function reorderCategories(categories:Category[],ids:string[]):Category[];

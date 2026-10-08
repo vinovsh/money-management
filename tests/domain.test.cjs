@@ -17,3 +17,6 @@ test('custom categories and appearance survive backup validation',()=>{
  s.data.settings.theme='unknown';a.throws(()=>d.validateSnapshot(s));s.data.settings.theme='light';
  s.data.settings.primaryColor='invalid';a.throws(()=>d.validateSnapshot(s));
 });
+
+test('transaction time validates and legacy transactions stay compatible',()=>{const t=tx('expense',100);d.validateTransaction(t,accounts,d.CATEGORY_SEEDS);for(const time of ['00:00','23:59','09:30'])d.validateTransaction({...t,time},accounts,d.CATEGORY_SEEDS);for(const time of ['24:00','12:60','9:30',123])a.throws(()=>d.validateTransaction({...t,time},accounts,d.CATEGORY_SEEDS));});
+test('category reorder preserves IDs and rejects incomplete or mixed orders',()=>{const cs=[{id:'a',type:'expense'},{id:'b',type:'expense'},{id:'c',type:'income'}];const ordered=d.reorderCategories(cs,['b','a']);a.equal(ordered.find(c=>c.id==='b').order,0);a.equal(ordered.find(c=>c.id==='a').order,1);a.equal(ordered.find(c=>c.id==='c'),cs[2]);for(const ids of [['a'],['a','a'],['b','c'],['x']])a.throws(()=>d.reorderCategories(cs,ids));});
