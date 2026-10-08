@@ -1,0 +1,1 @@
+export function createDragSession(onActiveChange:(active:boolean)=>void):{id:string|null;active:boolean;arm:(id:string)=>void;shouldCapture:(dx:number,dy:number)=>boolean;start:()=>void;stop:()=>void};

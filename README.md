@@ -2,6 +2,12 @@
 
 Offline-first personal finance app built with **React Native CLI + TypeScript**, targeting Android first. The UI follows the approved Moneywise mobile concept.
 
+## Version 0.3.2
+
+- Modal content mounts after the opening animation, inside an explicitly bounded scroll viewport.
+- Android uses native keyboard resizing; hidden modal content is unmounted.
+- Category holds arm reordering without locking scroll. Only an active drag locks it; release, cancellation and closing restore scrolling.
+
 ## Version 0.3.1
 
 - One Date & time field: date on the left, 12-hour AM/PM time on the right.

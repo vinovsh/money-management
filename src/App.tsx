@@ -16,8 +16,8 @@ export default function App(){
  useEffect(()=>{if(!form)setDraggingCategory(false);},[form]);
  useEffect(()=>{if(!undo)return;const timer=setTimeout(()=>setUndo(null),12000);return()=>clearTimeout(timer);},[undo]);
  async function act(operation:()=>Promise<unknown>){if(busyRef.current)return false;busyRef.current=true;setBusy(true);try{await operation();setLedger(await Store.loadLedger());return true;}catch(e){Alert.alert('Could not complete this action',e instanceof Error?e.message:'Please try again. Your saved data has been kept.');return false;}finally{busyRef.current=false;setBusy(false);}}
- function add(){setEditing(undefined);setForm(true);}
- function edit(t:Transaction){setEditing(t);setForm(true);}
+ function add(){setDraggingCategory(false);setEditing(undefined);setForm(true);}
+ function edit(t:Transaction){setDraggingCategory(false);setEditing(t);setForm(true);}
  function page(name:string){if(tabs.some(([t])=>t===name)){setTab(name);setSubpage('');}else setSubpage(name);}
  applyTheme(ledger?.settings.theme,ledger?.settings.primaryColor);
  const base={flex:1,backgroundColor:C.bg} as const;
