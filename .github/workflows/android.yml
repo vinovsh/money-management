@@ -19,6 +19,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;26.1.10909125'
+          log-accepted-android-sdk-licenses: false
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund
       - name: Verify types and financial rules
