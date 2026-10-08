@@ -1,0 +1,53 @@
+name: Android APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify types and financial rules
+        run: |
+          npm run typecheck
+          npm test
+      - name: Configure Android compatibility
+        run: node scripts/prepare-android.cjs
+      - name: Prepare Gradle wrapper
+        run: |
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          chmod +x android/gradlew
+      - name: Create installable development signing key
+        run: |
+          keytool -genkeypair -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build -keypass moneywise-local-build -alias moneywise -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Moneywise Development,O=Moneywise,C=US"
+      - name: Build bundled release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+      - name: Package APK and build metadata
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Moneywise-0.1.0.apk
+          sha256sum dist/Moneywise-0.1.0.apk > dist/SHA256SUMS.txt
+          keytool -list -v -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build > dist/signing-certificate.txt
+          cp android/app/moneywise-dev.keystore dist/moneywise-development.keystore
+          cp package-lock.json dist/package-lock.json
+          printf '%s\n' "Development distribution only. Test ads. Google OAuth must be configured. Keep the included development key for compatible future APK updates; replace it with a securely managed production key before store distribution." > dist/BUILD-NOTES.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moneywise-Android-APK
+          path: dist/
+          retention-days: 30

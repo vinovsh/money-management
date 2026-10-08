@@ -1,0 +1,37 @@
+{
+  "name": "moneywise",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "start": "react-native start",
+    "test": "node --test tests/*.test.cjs",
+    "typecheck": "tsc --noEmit",
+    "apk": "cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-sqlite-storage": "6.0.1",
+    "react-native-svg": "15.11.2",
+    "react-native-fs": "2.20.0",
+    "react-native-document-picker": "9.3.1",
+    "react-native-aes-crypto": "3.0.3",
+    "@react-native-google-signin/google-signin": "13.2.0",
+    "react-native-google-mobile-ads": "14.7.0",
+    "react-native-share": "11.1.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "15.0.1",
+    "@react-native-community/cli-platform-android": "15.0.1",
+    "@react-native/babel-preset": "0.76.9",
+    "@react-native/metro-config": "0.76.9",
+    "@types/react": "^18.3.3",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

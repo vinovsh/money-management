@@ -1,0 +1,16 @@
+import type {Account,Category,Transaction,Filter,Snapshot} from './models';
+export const CATEGORY_SEEDS:Category[];
+export function today(date?:Date):string;
+export function validDate(value:unknown):boolean;
+export function moneyToMinor(text:string):number;
+export function signedMoneyToMinor(text:string):number;
+export function minorToInput(value:number):string;
+export function formatMoney(value:number,currency?:string):string;
+export function monthBounds(value?:string):{from:string;to:string};
+export function dayCount(from:string,to:string):number;
+export function filterTransactions(txs:Transaction[],f?:Filter):Transaction[];
+export function summary(txs:Transaction[]):{expenses:number;refunds:number;spending:number;income:number;net:number};
+export function accountBalance(account:Account,txs:Transaction[]):number;
+export function categoryTotals(txs:Transaction[]):{id:string;amount:number}[];
+export function validateTransaction(t:Transaction,accounts:Account[],categories:Category[]):void;
+export function validateSnapshot(s:unknown):Snapshot;

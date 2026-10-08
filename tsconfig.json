@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","lib":["ES2022"],"module":"ESNext","jsx":"react-native","moduleResolution":"bundler","allowJs":true,"checkJs":false,"strict":true,"esModuleInterop":true,"skipLibCheck":true,"noEmit":true,"resolveJsonModule":true,"types":["react"]},"include":["src/**/*"]}
