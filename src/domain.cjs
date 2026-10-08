@@ -80,6 +80,8 @@ function validateSnapshot(s) {
   if(!d.accounts.length||!d.categories.length)throw new Error('Backup needs an account and categories.');
   if(!['USD','INR','EUR','GBP','AUD','CAD'].includes(d.settings?.currency))throw new Error('Unsupported backup currency.');
   if(typeof d.settings.name!=='string'||d.settings.name.length>60)throw new Error('Invalid profile in backup.');
+  if(d.settings.theme!==undefined&&!['light','dark'].includes(d.settings.theme))throw new Error('Invalid backup theme.');
+  if(d.settings.primaryColor!==undefined&&(typeof d.settings.primaryColor!=='string'||!/^#[0-9a-f]{6}$/i.test(d.settings.primaryColor)))throw new Error('Invalid backup primary color.');
   for(const a of d.accounts){if(typeof a.name!=='string'||a.name.length>80||!Number.isSafeInteger(a.opening)||typeof a.archived!=='boolean')throw new Error('Invalid backup account.');}
   for(const c of d.categories){if(typeof c.name!=='string'||!['income','expense'].includes(c.type)||typeof c.color!=='string'||!/^#[0-9a-f]{6}$/i.test(c.color)||typeof c.icon!=='string')throw new Error('Invalid backup category.');}
   for(const t of d.transactions){validateTransaction(t,d.accounts,d.categories);if(typeof t.createdAt!=='string'||typeof t.updatedAt!=='string')throw new Error('Invalid transaction metadata.');}

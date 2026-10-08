@@ -9,3 +9,11 @@ test('same-account transfers and wrong category types are rejected',()=>{a.throw
 test('deleted transactions are absent from balances and category totals',()=>{const list=[tx('expense',100),tx('refund',200),tx('income',900),tx('expense',9999,{deletedAt:'now'})];a.equal(d.categoryTotals(list)[0].amount,-100);a.equal(d.accountBalance(accounts[0],list),11000);});
 function snap(){return {format:'moneywise-backup',version:1,data:{accounts,categories:d.CATEGORY_SEEDS,transactions:[tx('expense',100)],budgets:[],notes:[],goals:[],settings:{currency:'USD',name:'Friend'}}};}
 test('restore validation rejects duplicate IDs, invalid references and newer formats',()=>{a.ok(d.validateSnapshot(snap()));const s=snap();s.data.transactions.push({...s.data.transactions[0]});a.throws(()=>d.validateSnapshot(s));const b=snap();b.data.transactions[0].accountId='missing';a.throws(()=>d.validateSnapshot(b));const c=snap();c.version=99;a.throws(()=>d.validateSnapshot(c));});
+
+test('custom categories and appearance survive backup validation',()=>{
+ const s=snap();s.data.categories.push({id:'pets',name:'Pets',type:'expense',icon:'heart',color:'#7543BA'});
+ s.data.transactions[0].categoryId='pets';s.data.settings.theme='dark';s.data.settings.primaryColor='#7543BA';
+ a.equal(d.validateSnapshot(s),s);a.equal(s.data.transactions[0].categoryId,'pets');
+ s.data.settings.theme='unknown';a.throws(()=>d.validateSnapshot(s));s.data.settings.theme='light';
+ s.data.settings.primaryColor='invalid';a.throws(()=>d.validateSnapshot(s));
+});

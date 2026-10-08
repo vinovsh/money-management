@@ -43,8 +43,8 @@ jobs:
       - name: Package APK and build metadata
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/Moneywise-0.1.0.apk
-          sha256sum dist/Moneywise-0.1.0.apk > dist/SHA256SUMS.txt
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Moneywise-0.2.0.apk
+          sha256sum dist/Moneywise-0.2.0.apk > dist/SHA256SUMS.txt
           keytool -list -v -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build > dist/signing-certificate.txt
           cp android/app/moneywise-dev.keystore dist/moneywise-development.keystore
           cp package-lock.json dist/package-lock.json

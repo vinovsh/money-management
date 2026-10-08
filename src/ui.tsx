@@ -47,7 +47,7 @@ export function Header({title,subtitle,onBack,right}:{title:string;subtitle?:str
 export function Empty({icon='wallet',title,body,action,onPress}:{icon?:string;title:string;body:string;action?:string;onPress?:()=>void}){return <Card style={{alignItems:'center',paddingVertical:30}}><View style={[s.iconBox,{backgroundColor:C.tealLight,width:60,height:60,marginBottom:14}]}><Icon name={icon} size={30} color={C.teal}/></View><Text style={[s.section,{textAlign:'center'}]}>{title}</Text><Text style={[s.muted,{textAlign:'center',lineHeight:22,marginTop:8,marginBottom:action?18:0}]}>{body}</Text>{action&&onPress&&<Btn title={action} onPress={onPress}/>}</Card>;}
 export function Sheet({visible,title,onClose,children}:{visible:boolean;title:string;onClose:()=>void;children:React.ReactNode}){return <Modal visible={visible} animationType="slide" onRequestClose={onClose}><KeyboardAvoidingView style={{flex:1,backgroundColor:C.bg}} behavior={Platform.OS==='ios'?'padding':undefined}><View style={{height:Platform.OS==='ios'?48:20}}/><Header title={title} right={<Pressable accessibilityLabel="Close" onPress={onClose} hitSlop={15}><Icon name="close"/></Pressable>}/><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:20,paddingTop:0,paddingBottom:40}}>{children}</ScrollView></KeyboardAvoidingView></Modal>;}
 export function Progress({value,color=C.teal}:{value:number;color?:string}){return <View style={s.progress}><View style={{height:8,borderRadius:8,width:`${Math.max(0,Math.min(1,value))*100}%`,backgroundColor:color}}/></View>;}
-export const s=StyleSheet.create({
+function createStyles(){return StyleSheet.create({
  row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
  card:{backgroundColor:C.surface,borderRadius:20,padding:18,borderWidth:1,borderColor:C.line,marginBottom:12},
  heading:{fontSize:25,fontWeight:'800',color:C.ink,letterSpacing:-.6},section:{fontSize:17,fontWeight:'700',color:C.ink},
@@ -60,4 +60,14 @@ export const s=StyleSheet.create({
  progress:{height:8,borderRadius:8,backgroundColor:'#E9F0F2',overflow:'hidden',marginTop:12},
  divider:{height:1,backgroundColor:C.line,marginVertical:12},
  amount:{fontSize:19,fontWeight:'800',color:C.ink},
-});
+});}
+export let s=createStyles();
+const light={...C};
+export const PRIMARY_COLORS=['#07858C','#315ACB','#7543BA','#B53063','#A34D12'];
+let themeKey='';
+export function applyTheme(mode:string='light',primary:string=PRIMARY_COLORS[0]){
+ const dark=mode==='dark';const accent=PRIMARY_COLORS.includes(primary)?primary:PRIMARY_COLORS[0];
+ const key=mode+accent;if(key===themeKey)return;themeKey=key;
+ Object.assign(C,light,dark?{bg:'#101820',surface:'#1C2834',ink:'#F0F4F8',muted:'#AEBCCD',line:'#364554',greenLight:'#153A30'}:{}, {teal:accent,tealLight:dark?accent+'40':accent+'18'});
+ s=createStyles();
+}

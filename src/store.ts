@@ -1,4 +1,4 @@
-import type {Ledger,Snapshot,Transaction,Account,Budget,Journal,Goal,Settings} from './models';
+import type {Ledger,Snapshot,Transaction,Account,Budget,Journal,Goal,Settings,Category} from './models';
 import {CATEGORY_SEEDS, validateTransaction, validateSnapshot} from './domain.cjs';
 const SQLite = require('react-native-sqlite-storage');
 let database:any;
@@ -46,4 +46,14 @@ export async function restore(s:Snapshot){
  validateSnapshot(s);
  // SQLite commits the full replacement or preserves the old ledger on error.
  await atomic([...tables.map(t=>({sql:`DELETE FROM ${t}`})),...tables.flatMap(t=>s.data[t].map((item:any)=>insert(t,item))),{sql:"UPDATE metadata SET value=? WHERE key='settings'",args:[JSON.stringify({...s.data.settings,onboarding:true})]}]);
+}
+
+export async function saveCategory(c:Category,ledger:Ledger){
+ const name=c.name.trim();
+ if(!name||name.length>40)throw new Error('Enter a category name under 40 characters.');
+ if(!['expense','income'].includes(c.type)||!/^#[0-9a-f]{6}$/i.test(c.color))throw new Error('Choose a valid category type and color.');
+ const existing=ledger.categories.find(item=>item.id===c.id);
+ if(existing&&existing.type!==c.type)throw new Error('An existing category must keep its transaction type.');
+ if(ledger.categories.some(item=>item.id!==c.id&&item.type===c.type&&item.name.toLocaleLowerCase()===name.toLocaleLowerCase()))throw new Error('This category name already exists.');
+ await atomic([insert('categories',{...c,name})]);
 }

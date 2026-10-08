@@ -1,0 +1,17 @@
+import React,{useState} from 'react';
+import {View,Text,Pressable} from 'react-native';
+import {Sheet,Btn,Icon,C,s} from './ui';
+import {today,validDate} from './domain.cjs';
+const pad=(n:number)=>String(n).padStart(2,'0');
+export function DateField({label,value,onChangeText}:{label:string;value:string;onChangeText:(value:string)=>void}){
+ const [open,setOpen]=useState(false);const [month,setMonth]=useState(new Date());const [draft,setDraft]=useState(value);
+ function show(){const date=validDate(value)?value:today();const [y,m,d]=date.split('-').map(Number);setMonth(new Date(y,m-1,1));setDraft(date);setOpen(true);}
+ const y=month.getFullYear(),m=month.getMonth();const offset=(new Date(y,m,1).getDay()+6)%7;const days=new Date(y,m+1,0).getDate();
+ function move(months:number){const next=new Date(y,m+months,1);if(next.getFullYear()>=1900&&next.getFullYear()<=2100)setMonth(next);}
+ return <View style={{marginBottom:14}}><Text style={s.label}>{label}</Text><Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${value}. Choose date`} onPress={show} style={[s.input,s.row]}><Text style={s.text}>{value}</Text><Icon name="calendar" color={C.teal}/></Pressable>
+ <Sheet visible={open} title="Choose date" onClose={()=>setOpen(false)}><View style={[s.row,{marginBottom:16}]}><Pressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={()=>move(-1)} style={s.chip}><Icon name="back"/></Pressable><Text style={s.section}>{month.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</Text><Pressable accessibilityRole="button" accessibilityLabel="Next month" onPress={()=>move(1)} style={s.chip}><Icon name="next"/></Pressable></View>
+ <View style={s.row}><Btn title="Previous year" secondary onPress={()=>move(-12)}/><Btn title="Next year" secondary onPress={()=>move(12)}/></View>
+ <View style={{flexDirection:'row'}}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=><Text key={day} style={[s.muted,{width:'14.2857%',textAlign:'center',paddingVertical:12}]}>{day}</Text>)}</View>
+ <View style={{flexDirection:'row',flexWrap:'wrap'}}>{Array.from({length:Math.ceil((offset+days)/7)*7},(_,i)=>{const day=i-offset+1;if(day<1||day>days)return <View key={i} style={{width:'14.2857%',height:48}}/>;const date=`${y}-${pad(m+1)}-${pad(day)}`;return <Pressable key={i} accessibilityRole="button" accessibilityLabel={date} accessibilityState={{selected:date===draft}} onPress={()=>setDraft(date)} style={{width:'14.2857%',height:48,alignItems:'center',justifyContent:'center',borderRadius:12,backgroundColor:date===draft?C.teal:C.surface,borderWidth:date===today()?1:0,borderColor:C.teal}}><Text style={[s.text,{color:date===draft?'white':C.ink}]}>{day}</Text></Pressable>;})}</View>
+ <Text style={[s.text,{marginVertical:20}]}>Selected: {draft}</Text><Btn title="Today" secondary onPress={()=>{const date=today();setDraft(date);const [y,m]=date.split('-').map(Number);setMonth(new Date(y,m-1,1));}}/><Btn title="Use selected date" onPress={()=>{onChangeText(draft);setOpen(false);}}/><Btn title="Cancel" secondary onPress={()=>setOpen(false)}/></Sheet></View>;
+}

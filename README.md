@@ -2,6 +2,12 @@
 
 Offline-first personal finance app built with **React Native CLI + TypeScript**, targeting Android first. The UI follows the approved Moneywise mobile concept.
 
+## Version 0.2.0
+
+- Tap a date to open a calendar modal (transactions and custom report ranges). Choose a day and tap **Use selected date**.
+- Open **More → Categories** to add or edit expense/income categories. Transaction forms also offer **Add category** and long-press editing. Renames preserve category IDs and existing records.
+- Open **More → Settings → Appearance** for saved Light/Dark themes and five primary colors. Older ledgers default to Light and teal.
+
 ## Implemented
 
 - Expense, income, refund and transfer entry; edit, duplicate, delete and undo.
@@ -50,7 +56,7 @@ Only test application/unit IDs are configured. Offline or failed banner loads di
 
 ## Delivery scope and known limitations
 
-This is a first Android build, not the entire multi-phase specification. Recurring bills/local reminders, debts, receipt attachments, biometric lock, dark mode, budget notifications, automatic backups, production ad consent, multi-device sync and iOS native project are not included yet. Charts/list totals use the same filters; refunds can produce negative spending, which is shown in a table rather than a misleading donut. Reports cap custom ranges at ten years. Archive import is capped at 25 MB and 100,000 entities per table. Backup round trips/native crypto and device UX require runtime validation before production use. Do not claim a zero-data-loss guarantee.
+This is a first Android build, not the entire multi-phase specification. Recurring bills/local reminders, debts, receipt attachments, biometric lock, budget notifications, automatic backups, production ad consent, multi-device sync and iOS native project are not included yet. Charts/list totals use the same filters; refunds can produce negative spending, which is shown in a table rather than a misleading donut. Reports cap custom ranges at ten years. Archive import is capped at 25 MB and 100,000 entities per table. Backup round trips/native crypto and device UX require runtime validation before production use. Do not claim a zero-data-loss guarantee.
 
 ## Verification
 
