@@ -1,6 +1,6 @@
-# Moneywise
+# Walletway – Money Management
 
-Offline-first personal finance app built with **React Native CLI + TypeScript**, targeting Android first. The UI follows the approved Moneywise mobile concept.
+Offline-first personal finance app built with **React Native CLI + TypeScript**, targeting Android first. The UI follows the approved Walletway mobile concept.
 
 ## Version 0.3.2
 

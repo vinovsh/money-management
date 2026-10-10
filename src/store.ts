@@ -15,7 +15,7 @@ export async function openStore():Promise<void>{
  await new Promise<void>((resolve,reject)=>{database=SQLite.openDatabase({name:'moneywise.db',location:'default'},()=>resolve(),reject);});
  await atomic([{sql:'CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)'},...tables.map(t=>({sql:`CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, payload TEXT NOT NULL)`}))]);
  const schema=await read("SELECT value FROM metadata WHERE key='schema'");
- if(schema.length&&schema[0].value!=='1')throw new Error('This database requires a newer version of Moneywise. Your data has been kept.');
+ if(schema.length&&schema[0].value!=='1')throw new Error('This database requires a newer version of Walletway. Your data has been kept.');
  const settings=await read("SELECT value FROM metadata WHERE key='settings'");
  if(!settings.length){
  const defaults:Settings={currency:'USD',name:'Friend',onboarding:false,lastBackup:'',datasetId:id()};

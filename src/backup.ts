@@ -33,7 +33,7 @@ export async function decrypt(text:string,password:string):Promise<Snapshot>{
 export async function exportBackup(password:string){
  const path=`${RNFS.CachesDirectoryPath}/moneywise-${Date.now()}.moneywise.json`;
  await RNFS.writeFile(path,await encrypt(await snapshot(),password),'utf8');
- try{await Share.open({url:`file://${path}`,type:'application/json',title:'Save your encrypted Moneywise backup',failOnCancel:false});}finally{await RNFS.unlink(path).catch(()=>{});}
+ try{await Share.open({url:`file://${path}`,type:'application/json',title:'Save your encrypted Walletway backup',failOnCancel:false});}finally{await RNFS.unlink(path).catch(()=>{});}
 }
 export async function importBackup(password:string):Promise<Snapshot|null>{
  try{
