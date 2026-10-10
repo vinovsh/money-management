@@ -76,7 +76,7 @@ function validateTransaction(t,accounts,categories) {
   if(typeof t.tags!=='string'||t.tags.length>300)throw new Error('Tags must be under 300 characters.');
 }
 function validateSnapshot(s) {
-  if(!s||s.format!=='moneywise-backup'||s.version!==1||!s.data)throw new Error('This file is not a compatible Walletway backup.');
+  if(!s||s.format!=='moneywise-backup'||![1,2].includes(s.version)||!s.data)throw new Error('This file is not a compatible Walletway backup.');
   const d=s.data;
   for(const key of ['accounts','categories','transactions','budgets','notes','goals']){
     if(!Array.isArray(d[key])||d[key].length>100000)throw new Error('Backup is incomplete or exceeds the record limit.');

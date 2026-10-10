@@ -11,6 +11,7 @@ import android.os.CancellationSignal
 import android.hardware.biometrics.BiometricPrompt
 import android.hardware.biometrics.BiometricManager
 import com.facebook.react.bridge.*
+import com.facebook.react.ReactPackage
 import com.facebook.react.uimanager.ViewManager
 import org.json.JSONArray
 import org.json.JSONObject
@@ -64,7 +65,7 @@ object LocalReminders {
         if (!notify(c, id, title, body)) return false
         prefs(c).edit().putBoolean("once-$id", true).apply(); return true
     }
-    fun clear(c: Context) { save(c, "[]"); prefs(c).edit().clear().apply(); (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancelAll() }
+    fun clear(c: Context) { save(c, "[]"); (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancelAll() }
 }
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) { if (intent.action?.startsWith("walletway.") == true) LocalReminders.receive(context, intent.getStringExtra("id") ?: return) else LocalReminders.reschedule(context) }

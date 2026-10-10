@@ -7,7 +7,7 @@ export type Journal = {id:string; date:string; body:string};
 export type Goal = {id:string; name:string; target:number; saved:number};
 export type Settings = {currency:string; name:string; onboarding:boolean; lastBackup:string; datasetId:string; theme?:'light'|'dark'|'system'; primaryColor?:string; locale?:string; weekStart?:number; hideBalances?:boolean; dashboardOrder?:string[]; eveningReminder?:boolean; reminderTime?:string; budgetAlerts?:boolean; appLock?:boolean; templates?:EntryTemplate[]; recurring?:RecurringRule[]; debts?:Debt[]; goalContributions?:GoalContribution[]; lastAccountId?:string; adsEnabled?:boolean};
 export type Ledger = {accounts:Account[]; categories:Category[]; transactions:Transaction[]; budgets:Budget[]; notes:Journal[]; goals:Goal[]; settings:Settings};
-export type Snapshot = {format:'moneywise-backup';version:1;createdAt:string;data:Ledger; attachments?:Record<string,string>};
+export type Snapshot = {format:'moneywise-backup';version:1|2;createdAt:string;data:Ledger; attachments?:Record<string,string>};
 export type Filter = {from?:string;to?:string;type?:string;accountId?:string;categoryId?:string;search?:string;min?:number;max?:number};
 
 export type EntryTemplate = {id:string; name:string; type:TxType; amount:number; accountId:string; destinationId:string; categoryId:string; note:string; tags:string};
