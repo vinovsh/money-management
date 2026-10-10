@@ -29,7 +29,7 @@ Work is isolated to `uat`. Google sign-in/Drive expansion is excluded by request
 
 ## Verification included
 
-31 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator launch smoke check.
+32 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components.
 
 ## Acceptance work still required
 
