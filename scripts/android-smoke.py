@@ -21,6 +21,13 @@ for attempt in range(12):
     except subprocess.CalledProcessError:
         pass
 else:
+    logs = adb('logcat', '-d')
+    Path('dist/startup-failure.log').write_text(logs)
+    Path('dist/startup-failure.xml').write_text(locals().get('xml', 'no XML'))
+    print('STARTUP UI:', locals().get('xml', 'no XML'), flush=True)
+    print('STARTUP LOG:', '\n'.join(line for line in logs.splitlines() if any(word in line for word in ['ReactNative', 'FATAL', 'moneywise', 'SQLite', 'Exception'])), flush=True)
+    with Path('dist/startup-failure.png').open('wb') as image:
+        subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
     raise RuntimeError('Walletway onboarding did not appear on the Android emulator.')
 logs = adb('logcat', '-d')
 Path('dist/launch-smoke.log').write_text(logs)
@@ -67,6 +74,7 @@ node = scroll_to('Amount (INR)', upwards=False)
 entry = next((n for n in nodes() if n.attrib.get('class') == 'android.widget.EditText'), None)
 if entry is None:
     raise RuntimeError('Amount input was not visible.')
+adb('shell', 'settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '1')
 tap(entry)
 adb('shell', 'input', 'text', '12.50')
 adb('shell', 'input', 'keyevent', '4')
