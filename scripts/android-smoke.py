@@ -1,16 +1,34 @@
 """Fresh-install launch smoke check; no user financial records are present."""
 import subprocess
 import time
+import os
+import sys
 from pathlib import Path
 
 def adb(*args):
     return subprocess.check_output(['adb', *args], text=True, timeout=60)
 
-adb('install', '-r', 'android/app/build/outputs/apk/release/app-release.apk')
+adb('install', '-r', os.environ.get('SOURCE_APK', 'android/app/build/outputs/apk/release/app-release.apk'))
 adb('logcat', '-c')
 adb('shell', 'am', 'start', '-W', '-n', 'com.moneywise/.MainActivity')
 Path('dist').mkdir(exist_ok=True)
-for attempt in range(12):
+
+def capture_failure(kind, value, traceback):
+    try:
+        adb('shell', 'uiautomator', 'dump', '/sdcard/walletway.xml')
+        xml = adb('shell', 'cat', '/sdcard/walletway.xml')
+        logs = adb('logcat', '-d')
+        Path('dist/flow-failure.xml').write_text(xml)
+        Path('dist/flow-failure.log').write_text(logs)
+        print('FAILURE UI:', xml, flush=True)
+        print('FAILURE LOG:', '\n'.join(line for line in logs.splitlines() if any(word in line for word in ['ReactNative', 'FATAL', 'SQLite', 'Exception', 'moneywise'])), flush=True)
+        with Path('dist/flow-failure.png').open('wb') as image:
+            subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
+    finally:
+        sys.__excepthook__(kind, value, traceback)
+
+sys.excepthook = capture_failure
+for attempt in range(20):
     time.sleep(3)
     try:
         adb('shell', 'uiautomator', 'dump', '/sdcard/walletway.xml')
@@ -50,7 +68,14 @@ def tap(node):
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
 
 def find(text):
-    return next((n for n in nodes() if n.attrib.get('text') == text or n.attrib.get('content-desc') == text), None)
+    height = int(re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1][1])
+    candidates = [n for n in nodes() if n.attrib.get('text') == text or n.attrib.get('content-desc') == text]
+    candidates.sort(key=lambda n: n.attrib.get('clickable') != 'true')
+    for node in candidates:
+        x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
+        if y2 > y1 + 4 and y1 > 55 and y2 < height - 45:
+            return node
+    return None
 
 def scroll_to(text, upwards=True):
     size = re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1]
