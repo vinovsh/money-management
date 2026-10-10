@@ -73,7 +73,7 @@ def find(text):
     candidates.sort(key=lambda n: n.attrib.get('clickable') != 'true')
     for node in candidates:
         x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
-        if y2 > y1 + 4 and y1 > 55 and y2 < height - 45:
+        if y2 > y1 + 4 and y1 > 55 and y2 < height - (5 if text == 'More' else 45):
             return node
     return None
 
