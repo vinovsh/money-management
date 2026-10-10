@@ -18,3 +18,5 @@ export function validateSnapshot(s:unknown):Snapshot;
 export function reorderCategories(categories:Category[],ids:string[]):Category[];
 
 export function setMoneyLocale(locale:string):void;
+
+export function safeAdd(a:number,b:number):number;

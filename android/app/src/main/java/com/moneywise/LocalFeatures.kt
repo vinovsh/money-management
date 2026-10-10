@@ -90,6 +90,7 @@ class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactC
     }
     init { context.addActivityEventListener(listener) }
     override fun getName() = "LocalFeatures"
+    @ReactMethod(isBlockingSynchronousMethod = true) fun uuid(): String = java.util.UUID.randomUUID().toString()
     @ReactMethod fun schedule(json: String, promise: Promise) { try { LocalReminders.save(context, json); promise.resolve(true) } catch (e: Exception) { promise.reject("REMINDER", e.message, e) } }
     @ReactMethod fun notifyOnce(id: String, title: String, body: String, promise: Promise) { try { promise.resolve(LocalReminders.once(context, id, title, body)) } catch (e: Exception) { promise.reject("NOTIFICATION", e.message, e) } }
     @ReactMethod fun notificationStatus(promise: Promise) { promise.resolve(LocalReminders.permitted(context)) }

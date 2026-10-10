@@ -44,18 +44,19 @@ function filterTransactions(txs,f={}) {
   const search=(f.search||'').toLowerCase().trim();
   return txs.filter(t=>!t.deletedAt && (!f.from||t.date>=f.from) && (!f.to||t.date<=f.to) && (!f.type||t.type===f.type) && (!f.accountId||t.accountId===f.accountId||t.destinationId===f.accountId) && (!f.categoryId||t.categoryId===f.categoryId) && (!search||`${t.note||''} ${t.categoryId} ${t.tags||''}`.toLowerCase().includes(search)) && (f.min===undefined||t.amount>=f.min) && (f.max===undefined||t.amount<=f.max)).sort((a,b)=>b.date.localeCompare(a.date)||(b.time||'').localeCompare(a.time||'')||b.createdAt.localeCompare(a.createdAt));
 }
+function safeAdd(a,b){const value=a+b;if(!Number.isSafeInteger(value))throw new Error('The total exceeds the supported money range.');return value;}
 function summary(txs) {
   let expenses=0,income=0,refunds=0;
-  for(const t of txs){if(t.deletedAt)continue;if(t.type==='expense')expenses+=t.amount; if(t.type==='income')income+=t.amount;if(t.type==='refund')refunds+=t.amount;}
-  return {expenses,refunds,spending:expenses-refunds,income,net:income-expenses+refunds};
+  for(const t of txs){if(t.deletedAt)continue;if(t.type==='expense')expenses=safeAdd(expenses,t.amount); if(t.type==='income')income=safeAdd(income,t.amount);if(t.type==='refund')refunds=safeAdd(refunds,t.amount);}
+  return {expenses,refunds,spending:safeAdd(expenses,-refunds),income,net:safeAdd(safeAdd(income,-expenses),refunds)};
 }
 function accountBalance(account,txs) {
   let value=account.opening;
-  for(const t of txs){if(t.deletedAt)continue;if(t.accountId===account.id)value+=(t.type==='income'||t.type==='refund')?t.amount:-t.amount;if(t.type==='transfer'&&t.destinationId===account.id)value+=t.amount;}
+  for(const t of txs){if(t.deletedAt)continue;if(t.accountId===account.id)value=safeAdd(value,(t.type==='income'||t.type==='refund')?t.amount:-t.amount);if(t.type==='transfer'&&t.destinationId===account.id)value=safeAdd(value,t.amount);}
   return value;
 }
 function categoryTotals(txs) {
-  const map={};for(const t of txs){if(t.deletedAt||!['expense','refund'].includes(t.type))continue;map[t.categoryId]=(map[t.categoryId]||0)+(t.type==='refund'?-t.amount:t.amount);}
+  const map={};for(const t of txs){if(t.deletedAt||!['expense','refund'].includes(t.type))continue;map[t.categoryId]=safeAdd(map[t.categoryId]||0,t.type==='refund'?-t.amount:t.amount);}
   return Object.entries(map).map(([id,amount])=>({id,amount})).sort((a,b)=>b.amount-a.amount);
 }
 function validateTransaction(t,accounts,categories) {
@@ -92,6 +93,8 @@ function validateSnapshot(s) {
   for(const b of d.budgets){if(b.period!==undefined&&!['monthly','weekly','custom'].includes(b.period)||(b.startDate&&!validDate(b.startDate))||(b.endDate&&!validDate(b.endDate))||(b.period==='custom'&&(!b.startDate||!b.endDate||b.startDate>b.endDate))||(b.warning!==undefined&&(!Number.isInteger(b.warning)||b.warning<1||b.warning>=100)))throw new Error('Invalid budget period.');if(!Number.isSafeInteger(b.amount)||b.amount<=0||typeof b.name!=='string'||(b.categoryId&&!d.categories.some(c=>c.id===b.categoryId&&c.type==='expense')))throw new Error('Invalid backup budget.');}
   for(const n of d.notes){if(!validDate(n.date)||typeof n.body!=='string'||n.body.length>2000)throw new Error('Invalid journal entry.');}
   for(const g of d.goals){if(typeof g.name!=='string'||!Number.isSafeInteger(g.target)||g.target<=0||!Number.isSafeInteger(g.saved)||g.saved<0)throw new Error('Invalid savings goal.');}
+  summary(d.transactions);let balance=0;for(const account of d.accounts)balance=safeAdd(balance,accountBalance(account,d.transactions));
+  for(const t of d.transactions)if(t.refundOfId&&!d.transactions.some(original=>original.id===t.refundOfId&&original.type==='expense'))throw new Error('Invalid refund reference.');
   require('./planning.cjs').validatePlanning(d.settings,d.accounts,d.categories);
   if(s.attachments!==undefined){if(!s.attachments||typeof s.attachments!=='object'||Array.isArray(s.attachments))throw new Error('Invalid receipt archive.');let bytes=0;for(const [id,data] of Object.entries(s.attachments)){if(!d.transactions.some(t=>t.id===id)||typeof data!=='string'||!data.length||data.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(data)||data.length>7*1024*1024)throw new Error('Invalid receipt attachment.');bytes+=data.length;}if(bytes>17*1024*1024)throw new Error('Receipt archive is too large.');}
   return s;
@@ -108,3 +111,5 @@ function reorderCategories(categories,ids){
 module.exports.reorderCategories=reorderCategories;
 
 module.exports.setMoneyLocale=setMoneyLocale;
+
+module.exports.safeAdd=safeAdd;

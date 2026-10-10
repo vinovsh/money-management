@@ -11,10 +11,10 @@ import * as Store from './store';
 import type {Ledger,Transaction} from './models';
 const tabs=[['Home','home'],['Transactions','list'],['Calendar','calendar'],['Statistics','chart'],['More','dots']];
 export default function App(){
- const systemTheme=useColorScheme();const [locked,setLocked]=useState(false);const ledgerRef=useRef<Ledger|null>(null);const initialized=useRef(false);
+ const systemTheme=useColorScheme();const [locked,setLocked]=useState(false);const ledgerRef=useRef<Ledger|null>(null);const initialized=useRef(false);const loading=useRef(false);
  const [draggingCategory,setDraggingCategory]=useState(false);
  const [ledger,setLedger]=useState<Ledger|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const busyRef=useRef(false);const [tab,setTab]=useState('Home');const [subpage,setSubpage]=useState('');const [form,setForm]=useState(false);const [editing,setEditing]=useState<Transaction|undefined>();const [undo,setUndo]=useState<Transaction|null>(null);
- async function initialize(){setError('');try{await Store.openStore();await Store.processRecurring();const loaded=await Store.loadLedger();setLedger(loaded);if(!initialized.current){setLocked(!!loaded.settings.appLock);initialized.current=true;}}catch(e){setError(e instanceof Error?e.message:'Could not open your data.');}}
+ async function initialize(){if(loading.current)return;loading.current=true;setError('');try{await Store.openStore();await Store.processRecurring();const loaded=await Store.loadLedger();setLedger(loaded);if(!initialized.current){setLocked(!!loaded.settings.appLock);initialized.current=true;}}catch(e){setError(e instanceof Error?e.message:'Could not open your data.');}finally{loading.current=false;}}
  useEffect(()=>{initialize();},[]);
  ledgerRef.current=ledger;
  useEffect(()=>{const listener=AppState.addEventListener('change',state=>{if(state==='background'&&ledgerRef.current?.settings.appLock){setLocked(true);setForm(false);}if(state==='active'&&!busyRef.current)initialize();});return()=>listener.remove();},[]);
@@ -24,7 +24,7 @@ export default function App(){
  useEffect(()=>{if(!undo)return;const timer=setTimeout(()=>setUndo(null),12000);return()=>clearTimeout(timer);},[undo]);
  async function act(operation:()=>Promise<unknown>){if(busyRef.current)return false;busyRef.current=true;setBusy(true);try{await operation();setLedger(await Store.loadLedger());return true;}catch(e){Alert.alert('Could not complete this action',e instanceof Error?e.message:'Please try again. Your saved data has been kept.');return false;}finally{busyRef.current=false;setBusy(false);}}
  function add(){setDraggingCategory(false);setEditing(undefined);setForm(true);}
- function edit(t:Transaction){setDraggingCategory(false);setEditing(t);setForm(true);}
+ function edit(t:Transaction){if((ledger?.settings.debts||[]).some(d=>t.id==='debt:'+d.id||d.payments.some(p=>p.id===t.id))){Alert.alert('Debt transfer','Manage this record under More → Debts.');return;}setDraggingCategory(false);setEditing(t);setForm(true);}
  function page(name:string){if(tabs.some(([t])=>t===name)){setTab(name);setSubpage('');}else setSubpage(name);}
  const mode=ledger?.settings.theme==='system'?(systemTheme||'light'):ledger?.settings.theme;applyTheme(mode,ledger?.settings.primaryColor);setMoneyLocale(ledger?.settings.locale||'en-IN');
  const base={flex:1,backgroundColor:C.bg} as const;
