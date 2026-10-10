@@ -10,7 +10,7 @@ You choose images through the system document picker. A private copy, limited to
 
 Google backup is not configured for this UAT build. The existing optional adapter can send encrypted snapshots to your private Google Drive app-data folder only after account configuration and explicit user action.
 
-Optional test advertising is disabled by default. If enabled, Google’s consent SDK checks applicable consent before ad SDK initialization and requests test ads. The Google SDK may process device/network information under its own policies. Financial notes, balances, names and amounts are not supplied as ad parameters. Real monetization requires owner AdMob configuration and a reviewed regional consent setup.
+Demo/test advertising is visible by default and can be disabled in Settings. The labelled local preview itself makes no network requests. For the Google test banner, Google’s consent SDK checks applicable consent before ad SDK initialization and requests test ads. The Google SDK may process device/network information under its own policies. Financial notes, balances, names and amounts are not supplied as ad parameters. Real monetization requires owner AdMob configuration and a reviewed regional consent setup.
 
 Deleting the selected ledger removes its records and referenced receipts, while other currency ledgers remain. Uninstalling can remove device-local records. Export each ledger regularly if you need portable recovery. Recovery copies are private local plaintext and are not a substitute for an encrypted export.
 

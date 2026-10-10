@@ -24,7 +24,7 @@ Work is isolated to `uat`. Google sign-in/Drive expansion is excluded by request
 - Light/dark/system themes, primary colors, locale money formatting, configurable week start, reduced-motion month navigation, improved contrast and 48 dp chips.
 - Native biometric/device-credential app lock, local-data deletion for selected ledger, recovery-copy preview/restore.
 - Additive schema v2 transaction indexes with foreign-key references; v2 exports with compatible v1 archive imports; transactional restore and attachment cleanup on failure.
-- Optional test advertising is off by default. Consent is checked before SDK initialization/banner loading, with a privacy-options entry point. Real AdMob IDs and consent messages remain unconfigured.
+- Demo/test advertising is visible by default and can be disabled in Settings. A local preview remains visible when Google test ads cannot load. Consent is checked before SDK initialization/banner loading, with a privacy-options entry point. Real AdMob IDs and consent messages remain unconfigured.
 - Development signing key reuse from previous available artifacts. This is not production signing; preserve the key before artifact expiry.
 
 ## Verification included

@@ -79,7 +79,7 @@ Restore validates all records and replaces tables in one SQLite transaction. An 
 
 ## Advertising
 
-Only test application/unit IDs are configured. Offline or failed banner loads disappear. Before enabling live monetization, configure your AdMob IDs, implement/test regional consent and applicable iOS tracking behavior, and publish accurate privacy/store disclosures. Test ads must remain during development.
+Only test application/unit IDs are configured. Offline or failed Google test banner loads retain a labelled local demo preview and show a retry action. Before enabling live monetization, configure your AdMob IDs, implement/test regional consent and applicable iOS tracking behavior, and publish accurate privacy/store disclosures. Test ads must remain during development.
 
 ## Delivery scope and known limitations
 
