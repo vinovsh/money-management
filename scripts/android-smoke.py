@@ -95,17 +95,11 @@ tap(scroll_to('Add a transaction'))
 time.sleep(2)
 scroll_to('Save expense')
 print('Initial Add Transaction modal scroll reaches Save before editing a field.')
-node = scroll_to('Amount (INR)', upwards=False)
-entry = next((n for n in nodes() if n.attrib.get('class') == 'android.widget.EditText'), None)
-if entry is None:
-    raise RuntimeError('Amount input was not visible.')
-adb('shell', 'settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '1')
-tap(entry)
-adb('shell', 'input', 'text', '12.50')
-adb('shell', 'input', 'keyevent', '4')
+for key in ['1', '2', '.', '5', '0']:
+    tap(scroll_to(key, upwards=False))
 tap(scroll_to('Save expense'))
 time.sleep(3)
-if find('Add a transaction') is None and find('Walletway') is None:
+if not any(n.attrib.get('text') == 'Walletway' for n in nodes()):
     raise RuntimeError('Saving a transaction did not return to Home.')
 logs = adb('logcat', '-d')
 Path('dist/launch-smoke.log').write_text(logs)
