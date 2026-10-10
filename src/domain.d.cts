@@ -16,3 +16,5 @@ export function validateTransaction(t:Transaction,accounts:Account[],categories:
 export function validateSnapshot(s:unknown):Snapshot;
 
 export function reorderCategories(categories:Category[],ids:string[]):Category[];
+
+export function setMoneyLocale(locale:string):void;

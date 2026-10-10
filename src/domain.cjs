@@ -30,8 +30,10 @@ function signedMoneyToMinor(text) {
   return (negative?-1:1)*moneyToMinor(negative?String(text).trim().slice(1):text);
 }
 function minorToInput(value){return (value/100).toFixed(2);}
+let moneyLocale='en-IN';
+function setMoneyLocale(locale){moneyLocale=['en-IN','en-US','en-GB'].includes(locale)?locale:'en-IN';}
 function formatMoney(value,currency='USD') {
-  return new Intl.NumberFormat('en-US',{style:'currency',currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(value/100);
+  return new Intl.NumberFormat(moneyLocale,{style:'currency',currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(value/100);
 }
 function monthBounds(value=today()) {
   const [y,m]=value.split('-').map(Number);
@@ -68,6 +70,7 @@ function validateTransaction(t,accounts,categories) {
     const category=categories.find(c=>c.id===t.categoryId);
     if(!category || category.type!==(t.type==='income'?'income':'expense'))throw new Error('Choose a category for this transaction type.');
   }
+  if(t.refundOfId&&(t.type!=='refund'||typeof t.refundOfId!=='string'))throw new Error('Invalid refund link.');
   if(typeof t.note!=='string'||t.note.length>2000)throw new Error('Notes must be under 2,000 characters.');
   if(typeof t.tags!=='string'||t.tags.length>300)throw new Error('Tags must be under 300 characters.');
 }
@@ -81,14 +84,16 @@ function validateSnapshot(s) {
   if(!d.accounts.length||!d.categories.length)throw new Error('Backup needs an account and categories.');
   if(!['USD','INR','EUR','GBP','AUD','CAD'].includes(d.settings?.currency))throw new Error('Unsupported backup currency.');
   if(typeof d.settings.name!=='string'||d.settings.name.length>60)throw new Error('Invalid profile in backup.');
-  if(d.settings.theme!==undefined&&!['light','dark'].includes(d.settings.theme))throw new Error('Invalid backup theme.');
+  if(d.settings.theme!==undefined&&!['light','dark','system'].includes(d.settings.theme))throw new Error('Invalid backup theme.');
   if(d.settings.primaryColor!==undefined&&(typeof d.settings.primaryColor!=='string'||!/^#[0-9a-f]{6}$/i.test(d.settings.primaryColor)))throw new Error('Invalid backup primary color.');
   for(const a of d.accounts){if(typeof a.name!=='string'||a.name.length>80||!Number.isSafeInteger(a.opening)||typeof a.archived!=='boolean')throw new Error('Invalid backup account.');}
   for(const c of d.categories){if(c.order!==undefined&&(!Number.isSafeInteger(c.order)||c.order<0))throw new Error('Invalid category order.');if(typeof c.name!=='string'||!['income','expense'].includes(c.type)||typeof c.color!=='string'||!/^#[0-9a-f]{6}$/i.test(c.color)||typeof c.icon!=='string')throw new Error('Invalid backup category.');}
   for(const t of d.transactions){validateTransaction(t,d.accounts,d.categories);if(typeof t.createdAt!=='string'||typeof t.updatedAt!=='string')throw new Error('Invalid transaction metadata.');}
-  for(const b of d.budgets){if(!Number.isSafeInteger(b.amount)||b.amount<=0||typeof b.name!=='string'||(b.categoryId&&!d.categories.some(c=>c.id===b.categoryId&&c.type==='expense')))throw new Error('Invalid backup budget.');}
+  for(const b of d.budgets){if(b.period!==undefined&&!['monthly','weekly','custom'].includes(b.period)||(b.startDate&&!validDate(b.startDate))||(b.endDate&&!validDate(b.endDate))||(b.period==='custom'&&(!b.startDate||!b.endDate||b.startDate>b.endDate))||(b.warning!==undefined&&(!Number.isInteger(b.warning)||b.warning<1||b.warning>=100)))throw new Error('Invalid budget period.');if(!Number.isSafeInteger(b.amount)||b.amount<=0||typeof b.name!=='string'||(b.categoryId&&!d.categories.some(c=>c.id===b.categoryId&&c.type==='expense')))throw new Error('Invalid backup budget.');}
   for(const n of d.notes){if(!validDate(n.date)||typeof n.body!=='string'||n.body.length>2000)throw new Error('Invalid journal entry.');}
   for(const g of d.goals){if(typeof g.name!=='string'||!Number.isSafeInteger(g.target)||g.target<=0||!Number.isSafeInteger(g.saved)||g.saved<0)throw new Error('Invalid savings goal.');}
+  require('./planning.cjs').validatePlanning(d.settings,d.accounts,d.categories);
+  if(s.attachments!==undefined){if(!s.attachments||typeof s.attachments!=='object'||Array.isArray(s.attachments))throw new Error('Invalid receipt archive.');let bytes=0;for(const [id,data] of Object.entries(s.attachments)){if(!d.transactions.some(t=>t.id===id)||typeof data!=='string'||!data.length||data.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(data)||data.length>7*1024*1024)throw new Error('Invalid receipt attachment.');bytes+=data.length;}if(bytes>17*1024*1024)throw new Error('Receipt archive is too large.');}
   return s;
 }
 module.exports={CATEGORY_SEEDS,today,validDate,moneyToMinor,signedMoneyToMinor,minorToInput,formatMoney,monthBounds,dayCount,filterTransactions,summary,accountBalance,categoryTotals,validateTransaction,validateSnapshot};
@@ -101,3 +106,5 @@ function reorderCategories(categories,ids){
  return categories.map(c=>ids.includes(c.id)?{...c,order:ids.indexOf(c.id)}:c);
 }
 module.exports.reorderCategories=reorderCategories;
+
+module.exports.setMoneyLocale=setMoneyLocale;

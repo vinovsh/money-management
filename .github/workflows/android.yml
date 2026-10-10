@@ -1,10 +1,11 @@
 name: Android APK
 on:
   push:
-    branches: [main]
+    branches: [main, uat]
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,23 +35,43 @@ jobs:
         run: |
           curl --fail --location --retry 3 https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
           chmod +x android/gradlew
+      - name: Restore previous development signing key
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/restore-development-key.py
       - name: Create installable development signing key
         run: |
-          keytool -genkeypair -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build -keypass moneywise-local-build -alias moneywise -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Moneywise Development,O=Moneywise,C=US"
+          if [ ! -f android/app/moneywise-dev.keystore ]; then keytool -genkeypair -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build -keypass moneywise-local-build -alias moneywise -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Walletway Development,O=Walletway,C=IN"; fi
       - name: Build bundled release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon --stacktrace
       - name: Package APK and build metadata
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/Moneywise-0.3.2.apk
-          sha256sum dist/Moneywise-0.3.2.apk > dist/SHA256SUMS.txt
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Walletway-0.4.0-UAT.apk
+          sha256sum dist/Walletway-0.4.0-UAT.apk > dist/SHA256SUMS.txt
           keytool -list -v -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build > dist/signing-certificate.txt
           cp android/app/moneywise-dev.keystore dist/moneywise-development.keystore
           cp package-lock.json dist/package-lock.json
           printf '%s\n' "Development distribution only. Test ads. Google OAuth must be configured. Keep the included development key for compatible future APK updates; replace it with a securely managed production key before store distribution." > dist/BUILD-NOTES.txt
+      - name: Enable emulator acceleration
+        if: github.ref_name == 'uat'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android emulator launch smoke test
+        if: github.ref_name == 'uat'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 scripts/android-smoke.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Moneywise-Android-APK
+          name: Walletway-UAT-APK
           path: dist/
           retention-days: 30

@@ -1,7 +1,7 @@
 import React,{useState,useEffect} from 'react';
 import {View,Text,Pressable,TextInput,StyleSheet,ScrollView,Modal,KeyboardAvoidingView,Platform,Keyboard,Image} from 'react-native';
 import Svg,{Path,Circle,Rect,Line} from 'react-native-svg';
-export const C={bg:'#F5F7F8',surface:'#FFFFFF',ink:'#18243A',muted:'#788497',line:'#E8EDF0',teal:'#315ACB',tealLight:'#EDF2FF',red:'#F17866',green:'#32A77D',greenLight:'#EBF8F0',purple:'#9685D5',amber:'#E8B342'};
+export const C={bg:'#F5F7F8',surface:'#FFFFFF',ink:'#18243A',muted:'#59677B',line:'#E8EDF0',teal:'#315ACB',tealLight:'#EDF2FF',red:'#B83E2A',green:'#167451',greenLight:'#EBF8F0',purple:'#9685D5',amber:'#E8B342'};
 export const EXTRA_ICONS=['plane','train','bike','fuel','phone','wifi','school','book','music','game','pet','baby','doctor','fitness','restaurant','grocery','rent','electric','water','insurance','tax','investment','salary','subscription'];
 const paths:Record<string,string>={
  clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l4 2',
@@ -74,7 +74,7 @@ function createStyles(){return StyleSheet.create({
  button:{backgroundColor:C.teal,borderRadius:14,minHeight:52,paddingHorizontal:18,paddingVertical:14,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:10,marginBottom:10},
  buttonText:{color:'white',fontWeight:'700',fontSize:15},secondary:{backgroundColor:C.surface,borderWidth:1,borderColor:'#A8D3D4'},
  label:{fontSize:13,fontWeight:'600',color:C.muted,marginBottom:8},input:{borderWidth:1,borderColor:C.line,backgroundColor:C.surface,borderRadius:14,padding:14,fontSize:16,color:C.ink,minHeight:50},
- chip:{paddingHorizontal:15,paddingVertical:11,borderRadius:12,borderWidth:1,borderColor:C.line,backgroundColor:C.surface,marginRight:8,marginBottom:8,minHeight:44,justifyContent:'center'},chipText:{fontSize:13,fontWeight:'600',color:C.muted},
+ chip:{paddingHorizontal:15,paddingVertical:11,borderRadius:12,borderWidth:1,borderColor:C.line,backgroundColor:C.surface,marginRight:8,marginBottom:8,minHeight:48,justifyContent:'center'},chipText:{fontSize:13,fontWeight:'600',color:C.muted},
  iconBox:{width:42,height:42,borderRadius:14,alignItems:'center',justifyContent:'center'},
  progress:{height:8,borderRadius:8,backgroundColor:'#E9F0F2',overflow:'hidden',marginTop:12},
  divider:{height:1,backgroundColor:C.line,marginVertical:12},
@@ -87,6 +87,6 @@ let themeKey='';
 export function applyTheme(mode:string='light',primary:string=PRIMARY_COLORS[0]){
  const dark=mode==='dark';const accent=PRIMARY_COLORS.includes(primary)?primary:PRIMARY_COLORS[0];
  const key=mode+accent;if(key===themeKey)return;themeKey=key;
- Object.assign(C,light,dark?{bg:'#101820',surface:'#1C2834',ink:'#F0F4F8',muted:'#AEBCCD',line:'#364554',greenLight:'#153A30'}:{}, {teal:accent,tealLight:dark?accent+'40':accent+'18'});
+ Object.assign(C,light,dark?{bg:'#101820',surface:'#1C2834',ink:'#F0F4F8',muted:'#AEBCCD',line:'#364554',red:'#FF9B89',green:'#6DDBAB',greenLight:'#153A30'}:{}, {teal:accent,tealLight:dark?accent+'40':accent+'18'});
  s=createStyles();
 }
