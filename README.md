@@ -88,3 +88,7 @@ This is a first Android build, not the entire multi-phase specification. Google 
 ## Verification
 
 `npm test` verifies decimal parsing, balances, transfers/refunds, filter consistency, calendar boundaries and restore validation using Node's test runner. `npm run typecheck` checks the React Native source. The CI workflow builds the Android release variant and attaches the APK, checksum, certificate details, development signing key and dependency lockfile. A successful build proves packaging, not device or UI correctness; test on actual devices before distribution.
+
+## Walletway 0.4.1
+
+More → Guide provides offline instructions for recording and editing transactions, calendar, reports, categories, budgets, goals, recurring entries, debts, appearance, notifications, security and local backups. Home shows a clearly labelled demo ad preview while the optional Google test banner loads; failed loads show status and Retry. Settings can hide demo/test ads. Google consent gating remains in place for SDK ads. The consolidated Android implementation is on main; production configuration and other pending items remain documented in UAT-CHECKLIST.md.

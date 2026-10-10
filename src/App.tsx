@@ -1,3 +1,4 @@
+import {Guide} from './Guide';
 import {Templates,Recurring,Debts,RecoveryCopies} from './Planning';
 import * as Local from './local';
 import {setMoneyLocale} from './domain.cjs';
@@ -32,7 +33,7 @@ export default function App(){
  if(!ledger)return <SafeAreaView style={[base,{alignItems:'center',justifyContent:'center'}]}><ActivityIndicator color={C.teal} size="large"/><Text style={[s.muted,{marginTop:18}]}>Opening your money space…</Text></SafeAreaView>;
  if(locked)return <SafeAreaView style={[base,{justifyContent:'center',padding:28}]}><Text style={s.heading}>Walletway is locked</Text><Text style={[s.muted,{marginVertical:18}]}>Unlock with your phone’s screen lock.</Text><Btn title="Unlock Walletway" onPress={async()=>{try{if(await Local.authenticate())setLocked(false);}catch(e){Alert.alert('Unlock unavailable',e instanceof Error?e.message:'Try again.');}}}/></SafeAreaView>;
  const current=subpage||tab;
- const screen=({'Home':Home,'Transactions':Transactions,'Calendar':Calendar,'Statistics':Statistics,'More':More,'Accounts':Accounts,'Budgets':Budgets,'Savings goals':Goals,'Backup & restore':BackupScreen,'Settings':Settings,'Categories':Categories,'Appearance':Appearance,'Templates':Templates,'Recurring entries':Recurring,'Debts':Debts,'Recovery copies':RecoveryCopies} as Record<string,React.ComponentType>)[current]||Home;
+ const screen=({'Guide':Guide,'Home':Home,'Transactions':Transactions,'Calendar':Calendar,'Statistics':Statistics,'More':More,'Accounts':Accounts,'Budgets':Budgets,'Savings goals':Goals,'Backup & restore':BackupScreen,'Settings':Settings,'Categories':Categories,'Appearance':Appearance,'Templates':Templates,'Recurring entries':Recurring,'Debts':Debts,'Recovery copies':RecoveryCopies} as Record<string,React.ComponentType>)[current]||Home;
  const Screen=screen;
  return <AppContext.Provider value={{ledger,busy,act,add,edit,page,undo:setUndo}}><SafeAreaView style={base}><StatusBar backgroundColor={C.bg} barStyle={mode==='dark'?'light-content':'dark-content'}/>{ledger.settings.onboarding?<>
  <Header title={current==='Home'?'Walletway':current} subtitle={current==='Home'?'Money Management':current==='Statistics'?'A clearer view of your money':undefined} onBack={subpage?()=>setSubpage(''):undefined} right={<Pressable accessibilityLabel="Add transaction" onPress={add} style={[s.iconBox,{backgroundColor:C.teal}]}><Icon name="plus" color="white"/></Pressable>}/>

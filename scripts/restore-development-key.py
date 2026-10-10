@@ -28,7 +28,7 @@ def get(url):
 
 try:
     data = json.loads(get('https://api.github.com/repos/' + repo + '/actions/artifacts?per_page=100'))
-    candidates = [a for a in data['artifacts'] if not a['expired'] and a['name'] in ('Walletway-UAT-APK', 'Moneywise-Android-APK')]
+    candidates = [a for a in data['artifacts'] if not a['expired'] and a['name'] in ('Walletway-Android-APK', 'Walletway-UAT-APK', 'Moneywise-Android-APK')]
     for artifact in sorted(candidates, key=lambda a: a['created_at'], reverse=True):
         try:
             archive = zipfile.ZipFile(io.BytesIO(get(artifact['archive_download_url'])))

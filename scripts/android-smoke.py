@@ -108,3 +108,19 @@ if 'FATAL EXCEPTION' in logs or 'com.facebook.react.common.JavascriptException' 
 with Path('dist/transaction-smoke.png').open('wb') as image:
     subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
 print('Android onboarding, initial modal scroll and transaction save passed.')
+
+# Check the new offline guide and the visible demo ad fallback.
+scroll_to('Advertisement · demo / test only')
+tap(scroll_to('More'))
+tap(scroll_to('Guide'))
+if not any(n.attrib.get('text') == 'Your Walletway guide' for n in nodes()):
+    raise RuntimeError('Guide did not open from More.')
+tap(scroll_to('Back up and recover'))
+scroll_to('Walletway 0.4.1 · Guide')
+with Path('dist/guide-smoke.png').open('wb') as image:
+    subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
+logs = adb('logcat', '-d')
+Path('dist/launch-smoke.log').write_text(logs)
+if 'FATAL EXCEPTION' in logs or 'com.facebook.react.common.JavascriptException' in logs:
+    raise RuntimeError('The emulator reported a guide-flow crash.')
+print('Offline guide navigation and demo advertising space passed.')
