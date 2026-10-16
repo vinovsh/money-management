@@ -1,6 +1,6 @@
 # Walletway 0.4.0 UAT — requirement coverage
 
-Work is isolated to `uat`. Google sign-in/Drive expansion is excluded by request.
+The consolidated Android code is on `main`. Google account backup was added after the user supplied OAuth configuration.
 
 ## Available for Android UAT
 
@@ -24,18 +24,18 @@ Work is isolated to `uat`. Google sign-in/Drive expansion is excluded by request
 - Light/dark/system themes, primary colors, locale money formatting, configurable week start, reduced-motion month navigation, improved contrast and 48 dp chips.
 - Native biometric/device-credential app lock, local-data deletion for selected ledger, recovery-copy preview/restore.
 - Additive schema v2 transaction indexes with foreign-key references; v2 exports with compatible v1 archive imports; transactional restore and attachment cleanup on failure.
-- Demo/test advertising is visible by default and can be disabled in Settings. A local preview remains visible when Google test ads cannot load. Consent is checked before SDK initialization/banner loading, with a privacy-options entry point. Real AdMob IDs and consent messages remain unconfigured.
+- Google test banners retain consent gating. Extra ad text, local demo preview and advertising settings controls have been removed. Real AdMob IDs and consent messages remain unconfigured.
 - Development signing key reuse from previous available artifacts. This is not production signing; preserve the key before artifact expiry.
 
 ## Verification included
 
-32 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components.
+44 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components. Drive tests cover native OAuth configuration, canceled sign-in, scoped paginated requests, account isolation, verified uploads, network failures, restore guards and automatic-backup opt-in/deduplication. Real Google account access and Keystore device behavior still require physical-device acceptance.
 
 ## Acceptance work still required
 
 These must not be described as completed production features:
 
-- Google OAuth, automatic Drive backup, retention/account-binding improvements: excluded by request.
+- Google Cloud project setup (Drive API, consent/test users, package/signing registration) and real-account Google sign-in/upload/download must be validated on a signed device. Account-bound encrypted snapshots and foreground automatic backup are implemented; simultaneous device edits are not merged. Drive versions are retained; no automatic pruning is performed.
 - iOS native project/build and VoiceOver/native permission validation: not part of this Android APK.
 - Phase 3 simultaneous multi-device sync/conflict resolution: requires a backend and a defined key-sharing protocol; no service is fabricated.
 - Store publication, owner contact/privacy URL, production signing secrets, live AdMob IDs/messages and store disclosures: require owner configuration. PRIVACY-POLICY.md is a review draft, not a published legal policy.

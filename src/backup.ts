@@ -2,7 +2,7 @@ import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import DocumentPicker from 'react-native-document-picker';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
-import {GOOGLE_WEB_CLIENT_ID,DRIVE_SCOPE} from './config';
+import {GOOGLE_ANDROID_CLIENT_ID,GOOGLE_WEB_CLIENT_ID,DRIVE_SCOPE} from './config';
 import {snapshot} from './store';
 import {validateSnapshot} from './domain.cjs';
 import type {Snapshot} from './models';
@@ -43,21 +43,27 @@ export async function importBackup(password:string):Promise<Snapshot|null>{
  try{const stat=await RNFS.stat(path);if(Number(stat.size)>MAX_BYTES)throw new Error('Backup exceeds the 25 MB safety limit.');return await decrypt(await RNFS.readFile(path,'utf8'),password);}finally{if(file.fileCopyUri)await RNFS.unlink(path).catch(()=>{});}
  }catch(e){if(DocumentPicker.isCancel(e))return null;throw e;}
 }
-function configure(){if(!GOOGLE_WEB_CLIENT_ID)throw new Error('Google backup needs an OAuth client ID. Local encrypted export and restore are available now.');GoogleSignin.configure({webClientId:GOOGLE_WEB_CLIENT_ID,scopes:[DRIVE_SCOPE]});}
-export async function connectGoogle():Promise<string>{configure();await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog:true});await GoogleSignin.signIn();const user=GoogleSignin.getCurrentUser();if(!user)throw new Error('Google sign-in did not finish.');return user.user.email;}
-async function token(){configure();return (await GoogleSignin.getTokens()).accessToken;}
-async function checked(response:Response){if(!response.ok){if(response.status===401||response.status===403)throw new Error('Google access expired or was denied. Reconnect Google and grant backup permission.');throw new Error(`Google Drive request failed (${response.status}). Your local data is safe.`);}return response;}
-export async function googleBackup(password:string){
- const s=await snapshot();const data=await encrypt(s,password);const access=await token();const boundary='moneywise_'+Date.now();
- const metadata={name:`moneywise-${s.data.settings.datasetId}-${Date.now()}.json`,parents:['appDataFolder'],appProperties:{datasetId:s.data.settings.datasetId,format:'moneywise-v1'}};
+let configured=false;
+function configure(){if(configured)return;if(!GOOGLE_ANDROID_CLIENT_ID)throw new Error('Google account configuration is missing.');GoogleSignin.configure({scopes:[DRIVE_SCOPE],...(GOOGLE_WEB_CLIENT_ID?{webClientId:GOOGLE_WEB_CLIENT_ID}:{})});configured=true;}
+export type GoogleAccount={id:string;email:string};
+export async function currentGoogle():Promise<GoogleAccount|null>{configure();try{await GoogleSignin.signInSilently();const user=GoogleSignin.getCurrentUser();return user?{id:user.user.id,email:user.user.email}:null;}catch{return null;}}
+export async function connectGoogle():Promise<GoogleAccount>{configure();await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog:true});const result=await GoogleSignin.signIn();if(result.type==='cancelled')throw new Error('Google sign-in was cancelled.');const user=GoogleSignin.getCurrentUser();if(!user)throw new Error('Google sign-in did not finish.');return {id:user.user.id,email:user.user.email};}
+async function token(accountId:string){configure();const user=GoogleSignin.getCurrentUser();if(!user||user.user.id!==accountId)throw new Error('The Google account changed. Reconnect and review the selected account.');return (await GoogleSignin.getTokens()).accessToken;}
+async function checked(response:Response){if(!response.ok){if(response.status===401||response.status===403)throw new Error('Google access expired or was denied. Reconnect Google, grant Drive backup permission and check that the Drive API is enabled.');throw new Error(`Google Drive request failed (${response.status}). Your local data is safe.`);}return response;}
+async function driveRequest(accountId:string,url:string,options:RequestInit={}){const access=await token(accountId);const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),60000);try{return await checked(await fetch(url,{...options,signal:controller.signal,headers:{...options.headers,Authorization:`Bearer ${access}`}}));}finally{clearTimeout(timer);}}
+export type DriveFile={id:string;name:string;createdTime:string;size?:string;appProperties?:{datasetId?:string;currency?:string}};
+export async function googleBackup(password:string,accountId:string,captured?:Snapshot){
+ const s=captured||await snapshot();const data=await encrypt(s,password);if(data.length>MAX_BYTES)throw new Error('Encrypted backup exceeds the 25 MB limit.');const boundary='moneywise_'+Date.now();
+ const metadata={name:`walletway-${s.data.settings.currency}-${s.data.settings.datasetId}-${Date.now()}.json`,parents:['appDataFolder'],appProperties:{datasetId:s.data.settings.datasetId,currency:s.data.settings.currency,format:'moneywise-v1'}};
  const body=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${data}\r\n--${boundary}--`;
- const created=await (await checked(await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:`Bearer ${access}`,'Content-Type':`multipart/related; boundary=${boundary}`},body}))).json();
- const remote=await (await checked(await fetch(`https://www.googleapis.com/drive/v3/files/${created.id}?alt=media`,{headers:{Authorization:`Bearer ${access}`}}))).text();
- if(remote!==data)throw new Error('Backup verification failed. The last good backup is unchanged.');
- return s.createdAt;
+ const created=await (await driveRequest(accountId,'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':`multipart/related; boundary=${boundary}`},body})).json();
+ if(typeof created.id!=='string'||!created.id)throw new Error('Google did not return a backup file ID.');
+ const remote=await (await driveRequest(accountId,`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(created.id)}?alt=media`)).text();
+ if(remote!==data)throw new Error('Backup verification failed. The previous backups are unchanged.');
+ return {createdAt:s.createdAt,id:String(created.id)};
 }
-export async function googleSnapshots(){const access=await token();const q=encodeURIComponent("trashed = false and appProperties has { key='format' and value='moneywise-v1' }");return (await (await checked(await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,name,createdTime,size)&orderBy=createdTime%20desc&pageSize=50`,{headers:{Authorization:`Bearer ${access}`}}))).json()).files as {id:string;name:string;createdTime:string;size?:string}[];}
-export async function readGoogleSnapshot(fileId:string,password:string){const access=await token();const response=await checked(await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,{headers:{Authorization:`Bearer ${access}`}}));return decrypt(await response.text(),password);}
+export async function googleSnapshots(accountId:string){const q=encodeURIComponent("trashed = false and appProperties has { key='format' and value='moneywise-v1' }");const files:DriveFile[]=[];let next='';do{const result=await (await driveRequest(accountId,`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=nextPageToken,files(id,name,createdTime,size,appProperties)&orderBy=createdTime%20desc&pageSize=100${next?'&pageToken='+encodeURIComponent(next):''}`)).json();files.push(...(result.files||[]));next=result.nextPageToken||'';if(files.length>=1000)break;}while(next);return files;}
+export async function readGoogleSnapshot(file:DriveFile,password:string,accountId:string){if(!file.size||!Number.isFinite(Number(file.size))||Number(file.size)>MAX_BYTES)throw new Error('Backup size is unavailable or exceeds the 25 MB limit.');const response=await driveRequest(accountId,`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}?alt=media`);return decrypt(await response.text(),password);}
 export async function disconnectGoogle(){configure();await GoogleSignin.signOut();}
 export async function safetySnapshot(){const backup=await snapshot();const path=`${RNFS.DocumentDirectoryPath}/pre-restore-${backup.data.settings.datasetId}-${Date.now()}.json`;await RNFS.writeFile(path,JSON.stringify(backup),'utf8');return path;}
 export async function exportCSV(ledger:Snapshot['data']){

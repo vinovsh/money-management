@@ -115,7 +115,7 @@ tap(scroll_to('Guide'))
 if not any(n.attrib.get('text') == 'Your Walletway guide' for n in nodes()):
     raise RuntimeError('Guide did not open from More.')
 tap(scroll_to('Back up and recover'))
-scroll_to('Walletway 0.4.1 · Guide')
+scroll_to('Walletway 0.5.0 · Guide')
 with Path('dist/guide-smoke.png').open('wb') as image:
     subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
 logs = adb('logcat', '-d')
@@ -123,3 +123,12 @@ Path('dist/launch-smoke.log').write_text(logs)
 if 'FATAL EXCEPTION' in logs or 'com.facebook.react.common.JavascriptException' in logs:
     raise RuntimeError('The emulator reported a guide-flow crash.')
 print('Offline guide navigation passed.')
+
+# The Google account panel must be reachable without requiring sign-in.
+adb('shell', 'input', 'keyevent', '4')
+tap(scroll_to('Settings'))
+scroll_to('Google account & Drive backup')
+scroll_to('Connect Google account')
+with Path('dist/google-settings-smoke.png').open('wb') as image:
+    subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
+print('Google Drive Settings entry point passed; real-account OAuth requires device acceptance.')

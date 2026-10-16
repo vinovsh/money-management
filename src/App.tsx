@@ -1,3 +1,4 @@
+import * as DriveSync from './driveSync';
 import {Guide} from './Guide';
 import {Templates,Recurring,Debts,RecoveryCopies} from './Planning';
 import * as Local from './local';
@@ -20,6 +21,7 @@ export default function App(){
  ledgerRef.current=ledger;
  useEffect(()=>{const listener=AppState.addEventListener('change',state=>{if(state==='background'&&ledgerRef.current?.settings.appLock){setLocked(true);setForm(false);}if(state==='active'&&!busyRef.current)initialize();});return()=>listener.remove();},[]);
  useEffect(()=>{if(ledger)Local.syncReminders(ledger).catch(()=>{});},[ledger]);
+ useEffect(()=>{if(!ledger||locked||busy||!ledger.settings.onboarding)return;const timer=setTimeout(()=>{if(AppState.currentState==='active')DriveSync.automatic(ledger);},3000);return()=>clearTimeout(timer);},[ledger,locked,busy]);
  useEffect(()=>{const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{if(form){setForm(false);return true;}if(subpage){setSubpage('');return true;}if(tab!=='Home'){setTab('Home');return true;}return false;});return()=>subscription.remove();},[form,subpage,tab]);
  useEffect(()=>{if(!form)setDraggingCategory(false);},[form]);
  useEffect(()=>{if(!undo)return;const timer=setTimeout(()=>setUndo(null),12000);return()=>clearTimeout(timer);},[undo]);

@@ -91,6 +91,42 @@ class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactC
     }
     init { context.addActivityEventListener(listener) }
     override fun getName() = "LocalFeatures"
+    // Recovery passphrases for optional automatic backups are device-local only.
+    // AES-GCM authenticates the value and its account/ledger storage key.
+    private fun driveKey(): javax.crypto.SecretKey {
+        val store = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val existing = store.getKey("walletway-drive-v1", null)
+        if (existing != null) return existing as javax.crypto.SecretKey
+        val generator = javax.crypto.KeyGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(android.security.keystore.KeyGenParameterSpec.Builder("walletway-drive-v1", android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE).build())
+        return generator.generateKey()
+    }
+    @ReactMethod fun driveSecretGet(key: String, promise: Promise) {
+        try {
+            val encoded = context.getSharedPreferences("drive-secrets", Context.MODE_PRIVATE).getString(key, null)
+            if (encoded == null) { promise.resolve(null); return }
+            val value = org.json.JSONObject(encoded)
+            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, driveKey(), javax.crypto.spec.GCMParameterSpec(128, android.util.Base64.decode(value.getString("iv"), android.util.Base64.NO_WRAP)))
+            cipher.updateAAD(key.toByteArray(Charsets.UTF_8))
+            promise.resolve(String(cipher.doFinal(android.util.Base64.decode(value.getString("data"), android.util.Base64.NO_WRAP)), Charsets.UTF_8))
+        } catch (e: Exception) { promise.reject("DRIVE_SECRET", "Cannot unlock saved backup settings. Reconnect Google and enter your recovery passphrase.", e) }
+    }
+    @ReactMethod fun driveSecretSet(key: String, value: String?, promise: Promise) {
+        try {
+            val editor = context.getSharedPreferences("drive-secrets", Context.MODE_PRIVATE).edit()
+            if (value == null) editor.remove(key) else {
+                val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, driveKey()); cipher.updateAAD(key.toByteArray(Charsets.UTF_8))
+                val encoded = org.json.JSONObject().put("iv", android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP))
+                    .put("data", android.util.Base64.encodeToString(cipher.doFinal(value.toByteArray(Charsets.UTF_8)), android.util.Base64.NO_WRAP))
+                editor.putString(key, encoded.toString())
+            }
+            if (!editor.commit()) throw java.io.IOException("Could not save backup settings")
+            promise.resolve(true)
+        } catch (e: Exception) { promise.reject("DRIVE_SECRET", "Could not save encrypted backup settings.", e) }
+    }
     @ReactMethod(isBlockingSynchronousMethod = true) fun uuid(): String = java.util.UUID.randomUUID().toString()
     @ReactMethod fun schedule(json: String, promise: Promise) { try { LocalReminders.save(context, json); promise.resolve(true) } catch (e: Exception) { promise.reject("REMINDER", e.message, e) } }
     @ReactMethod fun notifyOnce(id: String, title: String, body: String, promise: Promise) { try { promise.resolve(LocalReminders.once(context, id, title, body)) } catch (e: Exception) { promise.reject("NOTIFICATION", e.message, e) } }

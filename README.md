@@ -4,7 +4,7 @@ Offline-first personal finance app built with **React Native CLI + TypeScript**,
 
 ## Version 0.4.0 UAT
 
-See [UAT-CHECKLIST.md](UAT-CHECKLIST.md) for implemented features and remaining production acceptance work. This branch adds native evening reminders, templates, recurrence, debt repayments, advanced budgets, receipt backups, PDF reports, period comparisons, agenda view, separate currency ledgers, recovery previews and device authentication. Google backup expansion is excluded. Notifications use Android services with no third-party reminder library.
+See [UAT-CHECKLIST.md](UAT-CHECKLIST.md) for implemented features and remaining production acceptance work. This branch adds native evening reminders, templates, recurrence, debt repayments, advanced budgets, receipt backups, PDF reports, period comparisons, agenda view, separate currency ledgers, recovery previews and device authentication. Google account backup is available in Settings. Notifications use Android services with no third-party reminder library.
 
 ## Version 0.3.2
 
@@ -65,25 +65,27 @@ The GitHub Actions workflow creates a bundled, signed development release APK un
 
 For a local build, obtain the official Gradle 8.10.2 wrapper JAR at `android/gradle/wrapper/gradle-wrapper.jar`, configure the Android SDK path, and generate/provide a development keystore matching `android/app/build.gradle`. Then run `npm run apk`. For Metro development, use `npm start` and `npm run android`; a debug manifest allowing local HTTP traffic may be needed for device/Metro connectivity.
 
-## Google configuration
+## Google account and Drive backup
 
-Set `GOOGLE_WEB_CLIENT_ID` in `src/config.ts` to a registered Google web OAuth client ID. Register the Android package `com.moneywise` and the installed APK's signing SHA-1 as an Android OAuth client, enable Google Drive API, and complete the consent-screen setup. The workflow includes the certificate fingerprint in its artifact. OAuth client IDs are public configuration; **never place client secrets or tokens in source code**.
+More → Settings → Google account & Drive backup connects a Google account, uploads a verified encrypted snapshot, finds account backups and previews a restore. The same controls remain available from Backup & restore. Automatic backup is opt-in per account and ledger: after changes while the app is open and unlocked, a debounced upload runs. Unchanged snapshots are skipped. Offline errors leave local records and the last verified backup intact; retry follows a change or next open. Newer snapshots from another device block uploads for review. Restore creates a safety copy and replaces the selected currency ledger after confirmation; it disables automatic backup until reviewed. This is versioned backup/restore, not real-time record merging. All versions are retained in Drive and use the account’s storage quota.
 
-Backups use the restricted `drive.appdata` scope and are uploaded on explicit user action. Every snapshot is immutable and verified by download before success is reported. This release does not implement automatic background backups or multi-device synchronization. Sign-in is disabled visibly until configured. Reconnect Google after opening the Backup screen if the connection display has reset.
+The supplied public Android OAuth ID and project (`playstore-apps-511810`) are recorded in `src/config.ts`. Native Android sign-in resolves the registered package and signing certificate; an Android ID must never be supplied as `webClientId`. No client secret or access token is committed. For a signed APK, register `com.moneywise` with SHA-1 `48:89:0D:7E:79:AC:39:B6:FE:CB:8F:B9:27:D3:7C:9B:05:62:9B:B6` in the same Cloud project, enable Google Drive API, configure the OAuth consent screen with `drive.appdata`, and add test users while the consent app is in testing. Store-distributed builds must register the Play signing fingerprint as well. Cloud settings and real Google account access require device verification; the uploaded JSON alone does not prove these are enabled.
+
+Automatic backup stores its recovery passphrase only on this device, authenticated and encrypted with an Android Keystore AES-GCM key. AAD binds each value to the Google account and ledger. Settings are excluded from financial archives and Android automatic OS backup is disabled. Disconnect removes all cached passphrases for that account; remote backups and local records stay intact. Keep the passphrase for recovery on a new device; losing it makes encrypted archives unrecoverable. Manual backup passphrases are not persisted.
 
 ## Encryption and recovery
 
-Local/Drive archives use AES-256-CBC with encrypt-then-HMAC-SHA256 and separate encryption/authentication keys derived through PBKDF2-SHA256 (210,000 iterations, random salt). HMAC is verified before decryption. Native crypto is supplied by `react-native-aes-crypto`. The recovery passphrase must be at least 12 characters, is not persisted, and is required for recovery on another device. A passphrase cannot be recovered through Google. The SQLite database is app-private but **not encrypted at rest**. OS automatic backup is disabled to avoid unintended copies.
+Local/Drive archives use AES-256-CBC with encrypt-then-HMAC-SHA256 and separate encryption/authentication keys derived through PBKDF2-SHA256 (210,000 iterations, random salt). HMAC is verified before decryption. Native crypto is supplied by `react-native-aes-crypto`. The recovery passphrase must be at least 12 characters and is required for recovery on another device. Automatic backup optionally protects it in Android Keystore on the current device only. A passphrase cannot be recovered through Google. The SQLite database is app-private but **not encrypted at rest**. OS automatic backup is disabled to avoid unintended copies.
 
 Restore validates all records and replaces tables in one SQLite transaction. An app-private pre-restore safety JSON snapshot is created first; it is not an encrypted shareable backup. More → Recovery copies previews and restores these copies. The database uses versioned entity tables with JSON payloads and additive transaction indexes, rather than the full normalized reporting schema proposed for a later high-volume release; this version loads the ledger into memory for calculations.
 
 ## Advertising
 
-Only test application/unit IDs are configured. Offline or failed Google test banner loads retain a labelled local demo preview and show a retry action. Before enabling live monetization, configure your AdMob IDs, implement/test regional consent and applicable iOS tracking behavior, and publish accurate privacy/store disclosures. Test ads must remain during development.
+Only test application/unit IDs are configured. Extra ad captions and settings controls are removed; failed test ads stay hidden and retry automatically. Before enabling live monetization, configure your AdMob IDs, implement/test regional consent and applicable iOS tracking behavior, and publish accurate privacy/store disclosures. Test ads must remain during development.
 
 ## Delivery scope and known limitations
 
-This is a first Android build, not the entire multi-phase specification. Google automatic backups, production owner/store configuration, multi-device sync and the iOS native project remain outside this Android UAT build. See the current UAT checklist for feature coverage. Charts/list totals use the same filters; refunds can produce negative spending, which is shown in a table rather than a misleading donut. Reports cap custom ranges at ten years. Archive import is capped at 25 MB and 100,000 entities per table. Backup round trips/native crypto and device UX require runtime validation before production use. Do not claim a zero-data-loss guarantee.
+This is a first Android build, not the entire multi-phase specification. Production owner/store configuration, multi-device conflict merging and the iOS native project remain outside this Android build. See the current UAT checklist for feature coverage. Charts/list totals use the same filters; refunds can produce negative spending, which is shown in a table rather than a misleading donut. Reports cap custom ranges at ten years. Archive import is capped at 25 MB and 100,000 entities per table. Backup round trips/native crypto and device UX require runtime validation before production use. Do not claim a zero-data-loss guarantee.
 
 ## Verification
 
@@ -91,4 +93,4 @@ This is a first Android build, not the entire multi-phase specification. Google 
 
 ## Walletway 0.4.1
 
-More → Guide provides offline instructions for recording and editing transactions, calendar, reports, categories, budgets, goals, recurring entries, debts, appearance, notifications, security and local backups. Home shows a clearly labelled demo ad preview while the optional Google test banner loads; failed loads show status and Retry. Settings can hide demo/test ads. Google consent gating remains in place for SDK ads. The consolidated Android implementation is on main; production configuration and other pending items remain documented in UAT-CHECKLIST.md.
+More → Guide provides offline instructions for recording and editing transactions, calendar, reports, categories, budgets, goals, recurring entries, debts, appearance, notifications, security and local backups. Home uses Google test banners without additional captions or ad controls. Google consent gating remains in place for SDK ads. The consolidated Android implementation is on main; production configuration and other pending items remain documented in UAT-CHECKLIST.md.
