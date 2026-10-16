@@ -140,6 +140,9 @@ object GoogleDailyBackup {
                 p.edit().putBoolean("ready-$currency", false).commit(); throw IllegalStateException("A newer $currency backup was found. Open Backup and restore it or keep this phone’s data.")
             }
             val snap = snapshot(c, ledgers.getString(currency)); require(snap.getJSONObject("data").getJSONObject("settings").getString("currency") == currency)
+            // Local deletion pauses this ledger before clearing SQLite. Recheck after
+            // capturing it so an in-flight job cannot upload a freshly emptied ledger.
+            if (!p.getBoolean("ready-$currency", false)) continue
             val content = snap.toString(); val bytes = content.toByteArray(Charsets.UTF_8); require(bytes.size <= LIMIT) { "Backup exceeds the 25 MB limit." }
             val boundary = "walletway_${UUID.randomUUID()}"
             val metadata = JSONObject().put("name", "walletway-$currency-${System.currentTimeMillis()}.json").put("parents", JSONArray().put("appDataFolder"))
