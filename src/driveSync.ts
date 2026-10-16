@@ -6,11 +6,12 @@ const AES=require('react-native-aes-crypto').default;
 const native=NativeModules.LocalFeatures;
 type RecordState={auto:boolean;passphrase?:string;lastBackup?:string;hash?:string;remoteId?:string};
 let account:Backup.GoogleAccount|null=null;let loaded=false;let running=false;
+let pending:Ledger|null=null;
 let message='';const listeners=new Set<()=>void>();
 export const subscribe=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
 const emit=()=>listeners.forEach(fn=>fn());
 export const syncStatus=()=>({running,message});
-async function exclusive<T>(fn:()=>Promise<T>){if(running)throw new Error('A Google backup operation is already running. Please wait.');running=true;message='';emit();try{return await fn();}catch(e){message=e instanceof Error?e.message:'Google backup failed. Local data is safe.';throw e;}finally{running=false;emit();}}
+async function exclusive<T>(fn:()=>Promise<T>){if(running)throw new Error('A Google backup operation is already running. Please wait.');running=true;message='';emit();try{return await fn();}catch(e){message=e instanceof Error?e.message:'Google backup failed. Local data is safe.';throw e;}finally{running=false;emit();const next=pending;pending=null;if(next)setTimeout(()=>automatic(next),0);}}
 const key=(a:string,d:string)=>'drive:'+a+':'+d;
 async function read(a:string,d:string):Promise<RecordState>{const raw=await native.driveSecretGet(key(a,d));return raw?JSON.parse(raw):{auto:false};}
 async function write(a:string,d:string,value:RecordState){const indexKey='drive-index:'+a;const raw=await native.driveSecretGet(indexKey);const ids:string[]=raw?JSON.parse(raw):[];if(!ids.includes(d))await native.driveSecretSet(indexKey,JSON.stringify([...ids,d]));await native.driveSecretSet(key(a,d),JSON.stringify(value));emit();}
@@ -39,4 +40,4 @@ export async function list(){return exclusive(async()=>{const a=await getAccount
 export async function preview(file:Backup.DriveFile,pass:string){return exclusive(async()=>{const a=await getAccount();if(!a)throw new Error('Connect Google first.');return {snapshot:await Backup.readGoogleSnapshot(file,pass,a.id),accountId:a.id,fileId:file.id};});}
 export async function restore(selection:{snapshot:import('./models').Snapshot;accountId:string;fileId:string}){return exclusive(async()=>{const a=await getAccount();if(!a||a.id!==selection.accountId)throw new Error('Google account changed. Preview the backup again.');const current=await Store.loadLedger();if(current.settings.currency!==selection.snapshot.data.settings.currency)throw new Error('Switch to the backup currency ledger before restoring.');await disableRecord(a.id,current.settings.datasetId);await Backup.safetySnapshot();await Store.restore(selection.snapshot);await disableRecord(a.id,selection.snapshot.data.settings.datasetId);});}
 async function disableRecord(a:string,d:string){const old=await read(a,d);await write(a,d,{...old,auto:false,passphrase:undefined,remoteId:undefined,hash:undefined});}
-export async function automatic(ledger:Ledger){if(running)return;try{await upload(ledger);}catch{/* Surface the error in Settings; local writes never depend on the network. */}}
+export async function automatic(ledger:Ledger){if(running){pending=ledger;return;}try{await upload(ledger);}catch{/* Surface the error in Settings; local writes never depend on the network. */}}

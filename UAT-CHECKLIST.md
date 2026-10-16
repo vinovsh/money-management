@@ -29,7 +29,7 @@ The consolidated Android code is on `main`. Google account backup was added afte
 
 ## Verification included
 
-44 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components. Drive tests cover native OAuth configuration, canceled sign-in, scoped paginated requests, account isolation, verified uploads, network failures, restore guards and automatic-backup opt-in/deduplication. Real Google account access and Keystore device behavior still require physical-device acceptance.
+45 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components. Drive tests cover native OAuth configuration, canceled sign-in, scoped paginated requests, account isolation, verified uploads, network failures, restore guards and automatic-backup opt-in/deduplication. Real Google account access and Keystore device behavior still require physical-device acceptance.
 
 ## Acceptance work still required
 
