@@ -101,7 +101,7 @@ class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactC
     @ReactMethod fun googleSyncRead(account: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.readSync(context, account) } }
     @ReactMethod fun googleSyncRegister(paths: String, currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.register(context, paths, currency); "true" } }
     @ReactMethod fun googleSyncFinish(file: String, revision: String, timestamp: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.finish(context, file, revision, timestamp); "true" } }
-    @ReactMethod fun googleBackupRun(promise: Promise) { backupJob(promise) { GoogleDailyBackup.perform(context) } }
+    @ReactMethod fun googleBackupRun(promise: Promise) { backupJob(promise) { try { GoogleDailyBackup.perform(context) } catch (error: Exception) { GoogleDailyBackup.prefs(context).edit().putString("error", error.message ?: "Reconnect Google to retry sync.").commit(); throw error } } }
     @ReactMethod fun googleBackupDisconnect(promise: Promise) { backupJob(promise) { GoogleDailyBackup.disconnect(context); "true" } }
     @ReactMethod fun googleBackupReschedule(promise: Promise) { GoogleDailyBackup.schedule(context); promise.resolve(true) }
     // Recovery passphrases for optional automatic backups are device-local only.
