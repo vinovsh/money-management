@@ -15,7 +15,12 @@ function read(sql:string,args:unknown[]=[]):Promise<any[]>{
 }
 const tables=['accounts','categories','transactions','budgets','notes','goals'] as const;
 function insert(table:string,item:any){return {sql:`INSERT OR REPLACE INTO ${table} (id,payload) VALUES (?,?)`,args:[item.id,JSON.stringify(item)]};}
-export async function openStore():Promise<void>{
+let openingStore:Promise<void>|undefined;
+export function openStore():Promise<void>{
+ if(openingStore)return openingStore;
+ openingStore=initializeStore().finally(()=>{openingStore=undefined;});return openingStore;
+}
+async function initializeStore():Promise<void>{
  if(database&&storeReady)return;
  if(!openingProfileOverride&&activeDatabaseName==='moneywise.db'&&await RNFS.exists(PROFILE_PATH)){const profiles=await ledgerProfiles();activeDatabaseName=profiles.active;}
  if(database){await new Promise<void>(resolve=>database.close(resolve,resolve));database=undefined;}
