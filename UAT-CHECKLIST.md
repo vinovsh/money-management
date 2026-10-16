@@ -19,10 +19,10 @@ The consolidated Android code is on `main`. Google account backup was added afte
 - Recurring daily/weekly/monthly/yearly rules with reminder-only default, automatic-on-open mode, unique occurrence IDs, preserved month-end anchor, end date and large-backlog review.
 - Debts and repayments represented by atomic transfers to receivable/liability accounts; excluded from income/spending. Debt-linked transfers cannot be edited/deleted arbitrarily.
 - Goal contribution/withdrawal history without creating spending.
-- Private receipt-image picker (5 MB per image); encrypted local backup inclusion (12 MB combined receipts).
-- Separate local currency ledgers (USD/INR/EUR/GBP/AUD/CAD); explicit-rate conversion calculator, no silent exchange or mixed-currency sums. Export each ledger separately.
+- Private receipt-image picker (5 MB per image); Google sync inclusion (12 MB combined receipts).
+- Separate local currency ledgers (USD/INR/EUR/GBP/AUD/CAD); explicit-rate conversion calculator, no silent exchange or mixed-currency sums. Google sync covers every ledger in one file.
 - Light/dark/system themes, primary colors, locale money formatting, configurable week start, reduced-motion month navigation, improved contrast and 48 dp chips.
-- Native biometric/device-credential app lock, local-data deletion for selected ledger, recovery-copy preview/restore.
+- Native biometric/device-credential app lock, local-data deletion for selected ledger, internal pre-restore safety copies.
 - Additive schema v2 transaction indexes with foreign-key references; v2 exports with compatible v1 archive imports; transactional restore and attachment cleanup on failure.
 - Google test banners retain consent gating. Extra ad text, local demo preview and advertising settings controls have been removed. Real AdMob IDs and consent messages remain unconfigured.
 - Development signing key reuse from previous available artifacts. This is not production signing; preserve the key before artifact expiry.

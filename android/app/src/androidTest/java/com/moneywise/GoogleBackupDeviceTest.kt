@@ -47,6 +47,17 @@ class GoogleBackupDeviceTest {
     @Test fun databasePathsAreConfinedToLedgers() {
         try { GoogleDailyBackup.snapshot(context, "../../secret.db"); fail("Invalid path must fail") } catch (_: IllegalArgumentException) {}
     }
+    @Test fun oldVersionConnectionRequiresAutomaticRestoreBeforeSync() {
+        GoogleDailyBackup.prefs(context).edit().putString("accountId", "test-account").putBoolean("ready-CAD", true).commit()
+        assertFalse(JSONObject(GoogleDailyBackup.status(context, "CAD")).getBoolean("ready"))
+    }
+    @Test fun newCurrencyJoinsSingleSyncWhileDeletedCurrencyStaysPaused() {
+        GoogleDailyBackup.prefs(context).edit().putBoolean("syncReady", true).putString("ledgers", "{\"CAD\":\"moneywise-CAD.db\"}").putBoolean("ready-CAD", false).commit()
+        GoogleDailyBackup.register(context, "{\"CAD\":\"moneywise-CAD.db\",\"USD\":\"moneywise-USD.db\"}", "USD")
+        assertTrue(JSONObject(GoogleDailyBackup.status(context, "USD")).getBoolean("ready"))
+        assertFalse(JSONObject(GoogleDailyBackup.status(context, "CAD")).getBoolean("ready"))
+        assertEquals("USD", GoogleDailyBackup.prefs(context).getString("activeCurrency", ""))
+    }
     @Test fun midnightWorkIsPersistentAndDisconnectCancelsIt() {
         GoogleDailyBackup.prefs(context).edit().putString("accountId", "test-account").commit()
         GoogleDailyBackup.schedule(context)

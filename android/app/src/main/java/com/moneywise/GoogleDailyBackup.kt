@@ -151,7 +151,7 @@ object GoogleDailyBackup {
     fun status(c: Context, currency: String): String {
         val p = prefs(c)
         return JSONObject().put("accountId", p.getString("accountId", "")).put("email", p.getString("email", ""))
-            .put("registered", JSONObject(p.getString("ledgers", "{}")!!).has(currency)).put("ready", p.getBoolean("ready-$currency", false)).put("lastBackup", p.getString("last-$currency", ""))
+            .put("registered", JSONObject(p.getString("ledgers", "{}")!!).has(currency)).put("ready", p.getBoolean("syncReady", false) && p.getBoolean("ready-$currency", false)).put("lastBackup", p.getString("last-$currency", ""))
             .put("error", p.getString("error", "")).put("nextBackup", if (p.contains("accountId")) iso(BackupSchedule.nextMidnight(System.currentTimeMillis(), TimeZone.getDefault())) else "").toString()
     }
     fun schedule(c: Context, reset: Boolean = false) {
