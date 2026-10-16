@@ -46,12 +46,12 @@ jobs:
           if [ ! -f android/app/moneywise-dev.keystore ]; then keytool -genkeypair -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build -keypass moneywise-local-build -alias moneywise -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Walletway Development,O=Walletway,C=IN"; fi
       - name: Build bundled release APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew testReleaseUnitTest assembleRelease assembleReleaseAndroidTest --no-daemon --stacktrace
       - name: Package APK and build metadata
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/Walletway-0.5.0.apk
-          sha256sum dist/Walletway-0.5.0.apk > dist/SHA256SUMS.txt
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Walletway-0.6.0.apk
+          sha256sum dist/Walletway-0.6.0.apk > dist/SHA256SUMS.txt
           keytool -list -v -keystore android/app/moneywise-dev.keystore -storepass moneywise-local-build > dist/signing-certificate.txt
           cp android/app/moneywise-dev.keystore dist/moneywise-development.keystore
           cp package-lock.json dist/package-lock.json
@@ -69,7 +69,9 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: python3 scripts/android-smoke.py
+          script: |
+            python3 scripts/android-smoke.py
+            cd android && ./gradlew connectedReleaseAndroidTest --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,43 +1,36 @@
 import {NativeModules} from 'react-native';
 import * as Backup from './backup';
 import * as Store from './store';
-import type {Ledger} from './models';
-const AES=require('react-native-aes-crypto').default;
+import {CATEGORY_SEEDS} from './domain.cjs';
+import type {Ledger,Snapshot} from './models';
 const native=NativeModules.LocalFeatures;
-type RecordState={auto:boolean;passphrase?:string;lastBackup?:string;hash?:string;remoteId?:string};
-let account:Backup.GoogleAccount|null=null;let loaded=false;let running=false;
-let pending:Ledger|null=null;
-let message='';const listeners=new Set<()=>void>();
+type Status={accountId:string;email:string;ready:boolean;registered:boolean;lastBackup:string;error:string;nextBackup:string};
+export type Selection={snapshot:Snapshot;accountId:string;fileId:string};
+let running=false;let message='';const listeners=new Set<()=>void>();
 export const subscribe=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
 const emit=()=>listeners.forEach(fn=>fn());
 export const syncStatus=()=>({running,message});
-async function exclusive<T>(fn:()=>Promise<T>){if(running)throw new Error('A Google backup operation is already running. Please wait.');running=true;message='';emit();try{return await fn();}catch(e){message=e instanceof Error?e.message:'Google backup failed. Local data is safe.';throw e;}finally{running=false;emit();const next=pending;pending=null;if(next)setTimeout(()=>automatic(next),0);}}
-const key=(a:string,d:string)=>'drive:'+a+':'+d;
-async function read(a:string,d:string):Promise<RecordState>{const raw=await native.driveSecretGet(key(a,d));return raw?JSON.parse(raw):{auto:false};}
-async function write(a:string,d:string,value:RecordState){const indexKey='drive-index:'+a;const raw=await native.driveSecretGet(indexKey);const ids:string[]=raw?JSON.parse(raw):[];if(!ids.includes(d))await native.driveSecretSet(indexKey,JSON.stringify([...ids,d]));await native.driveSecretSet(key(a,d),JSON.stringify(value));emit();}
-export async function getAccount(){if(!loaded){account=await Backup.currentGoogle();loaded=true;}return account;}
-export async function connect(){return exclusive(async()=>{account=await Backup.connectGoogle();loaded=true;return account;});}
-export async function state(datasetId:string){const a=await getAccount();const value=a?await read(a.id,datasetId):{auto:false};return {account:a,auto:value.auto,lastBackup:value.lastBackup};}
-export async function disconnect(){return exclusive(async()=>{const a=await getAccount();if(a){const raw=await native.driveSecretGet('drive-index:'+a.id);for(const d of raw?JSON.parse(raw):[])await native.driveSecretSet(key(a.id,d),null);await native.driveSecretSet('drive-index:'+a.id,null);}await Backup.disconnectGoogle();account=null;loaded=true;emit();});}
-export async function disableAuto(datasetId:string){return exclusive(async()=>{const a=await getAccount();if(!a)return;const old=await read(a.id,datasetId);await write(a.id,datasetId,{...old,auto:false,passphrase:undefined});});}
-export async function upload(ledger:Ledger,password?:string,auto?:boolean){return exclusive(async()=>{
- const a=await getAccount();if(!a){if(password)throw new Error('Connect your Google account first.');return;}
- const datasetId=ledger.settings.datasetId;const old=await read(a.id,datasetId);const automatic=password===undefined;
- if(automatic&&!old.auto)return;
- const pass=password??old.passphrase;if(!pass||pass.length<12)throw new Error('Enter your recovery passphrase (at least 12 characters).');
- const captured=await Store.snapshot();if(captured.data.settings.datasetId!==datasetId)throw new Error('The selected ledger changed. Try again.');
- // Ignore backup timestamps; do not generate another snapshot merely for metadata.
- const data={...captured.data,settings:{...captured.data.settings,lastBackup:''}};
- const hash=await AES.sha256(JSON.stringify({data,attachments:captured.attachments}));
- if(automatic&&hash===old.hash)return;
- const files=await Backup.googleSnapshots(a.id);const latest=files.find(f=>f.appProperties?.datasetId===datasetId);
- if(old.remoteId&&latest&&latest.id!==old.remoteId)throw new Error('This ledger has a newer Google backup from another device. Automatic backup is paused. Review and restore that backup, or reconnect before creating a separate snapshot.');
- if(latest&&!old.remoteId)await Backup.readGoogleSnapshot(latest,pass,a.id);
- const result=await Backup.googleBackup(pass,a.id,captured);const enabled=auto??old.auto;
- await write(a.id,datasetId,{auto:enabled,passphrase:enabled?pass:undefined,lastBackup:result.createdAt,hash,remoteId:result.id});
+async function exclusive<T>(fn:()=>Promise<T>){if(running)throw new Error('Please wait for the Google backup operation to finish.');running=true;message='';emit();try{return await fn();}catch(e){message=e instanceof Error?e.message:'Google backup failed. Your local data is safe.';throw e;}finally{running=false;emit();}}
+export async function state(currency:string):Promise<Status>{return JSON.parse(await native.googleBackupStatus(currency));}
+export async function getAccount(currency:string){const s=await state(currency);return s.accountId?{id:s.accountId,email:s.email}:null;}
+export function hasLocalData(ledger:Ledger){return !!(ledger.transactions.length||ledger.budgets.length||ledger.goals.length||ledger.notes.length||ledger.accounts.some(a=>a.opening!==0||!['cash','cash-default','card-default','bank-default'].includes(a.id))||ledger.categories.some(c=>{const seed=CATEGORY_SEEDS.find((s:{id:string})=>s.id===c.id);return !seed||seed.name!==c.name||seed.icon!==c.icon;})||(ledger.settings.templates||[]).length||(ledger.settings.recurring||[]).length||(ledger.settings.debts||[]).length);}
+async function files(accountId:string,currency:string):Promise<Backup.DriveFile[]>{return JSON.parse(await native.googleBackupList(accountId,currency));}
+async function restoreSelected(selected:Selection){const a=await Backup.currentGoogle();if(!a||a.id!==selected.accountId)throw new Error('Google account changed. Connect again.');const ledger=await Store.loadLedger();if(ledger.settings.currency!==selected.snapshot.data.settings.currency)throw new Error('Switch to the backup currency before restoring.');await native.googleBackupPause(ledger.settings.currency);await Backup.safetySnapshot();await Store.restore(selected.snapshot);await native.googleBackupAccept(ledger.settings.currency,selected.fileId,selected.snapshot.createdAt);}
+export async function connect(ledger:Ledger){return exclusive(async()=>{
+ const a=await Backup.connectGoogle();await native.googleBackupConfigure(a.id,a.email,Store.activeLedgerDatabase(),ledger.settings.currency);
+ const found=(await files(a.id,ledger.settings.currency)).find(f=>f.appProperties?.currency===ledger.settings.currency);
+ if(found){await native.googleBackupPause(ledger.settings.currency);const selected={snapshot:await Backup.readSimpleGoogleSnapshot(found,a.id),accountId:a.id,fileId:found.id};
+  if(!hasLocalData(await Store.loadLedger())){await restoreSelected(selected);return {restored:true,selection:null,legacy:false};}
+  return {restored:false,selection:selected,legacy:false};
+ }
+ // Old passphrase archives cannot be decrypted on a new device without their key.
+ const legacy=(await Backup.googleSnapshots(a.id)).some(f=>f.appProperties?.currency===ledger.settings.currency||(!f.appProperties?.currency&&f.name.includes(ledger.settings.datasetId)));
+ if(legacy){await native.googleBackupPause(ledger.settings.currency);return {restored:false,selection:null,legacy:true};}
+ await native.googleBackupAccept(ledger.settings.currency,'','');await native.googleBackupRun();return {restored:false,selection:null,legacy:false};
  });}
-export async function list(){return exclusive(async()=>{const a=await getAccount();if(!a)throw new Error('Connect Google first.');return Backup.googleSnapshots(a.id);});}
-export async function preview(file:Backup.DriveFile,pass:string){return exclusive(async()=>{const a=await getAccount();if(!a)throw new Error('Connect Google first.');return {snapshot:await Backup.readGoogleSnapshot(file,pass,a.id),accountId:a.id,fileId:file.id};});}
-export async function restore(selection:{snapshot:import('./models').Snapshot;accountId:string;fileId:string}){return exclusive(async()=>{const a=await getAccount();if(!a||a.id!==selection.accountId)throw new Error('Google account changed. Preview the backup again.');const current=await Store.loadLedger();if(current.settings.currency!==selection.snapshot.data.settings.currency)throw new Error('Switch to the backup currency ledger before restoring.');await disableRecord(a.id,current.settings.datasetId);await Backup.safetySnapshot();await Store.restore(selection.snapshot);await disableRecord(a.id,selection.snapshot.data.settings.datasetId);});}
-async function disableRecord(a:string,d:string){const old=await read(a,d);await write(a,d,{...old,auto:false,passphrase:undefined,remoteId:undefined,hash:undefined});}
-export async function automatic(ledger:Ledger){if(running){pending=ledger;return;}try{await upload(ledger);}catch{/* Surface the error in Settings; local writes never depend on the network. */}}
+export async function discover(ledger:Ledger){return exclusive(async()=>{const s=await state(ledger.settings.currency);if(!s.accountId)return null;const found=(await files(s.accountId,ledger.settings.currency)).find(f=>f.appProperties?.currency===ledger.settings.currency);if(!found)return null;return {snapshot:await Backup.readSimpleGoogleSnapshot(found,s.accountId),accountId:s.accountId,fileId:found.id};});}
+export async function restore(selected:Selection){return exclusive(()=>restoreSelected(selected));}
+export async function keepLocal(ledger:Ledger,selected:Selection|null){return exclusive(async()=>{const s=await state(ledger.settings.currency);if(!s.accountId)throw new Error('Connect Google first.');if(selected&&selected.accountId!==s.accountId)throw new Error('Google account changed. Connect again.');if(!selected&&(await files(s.accountId,ledger.settings.currency)).some(f=>f.appProperties?.currency===ledger.settings.currency))throw new Error('A Google backup exists. Tap Restore from Google to review it first.');await native.googleBackupAccept(ledger.settings.currency,selected?.fileId||'',selected?.snapshot.createdAt||'');await native.googleBackupRun();});}
+export async function upload(){return exclusive(()=>native.googleBackupRun());}
+export async function disconnect(){return exclusive(async()=>{await native.googleBackupDisconnect();await Backup.disconnectGoogle();});}
+export async function automatic(_ledger:Ledger){try{await native.googleBackupReschedule();}catch{/* Existing local transactions never depend on scheduling. */}}

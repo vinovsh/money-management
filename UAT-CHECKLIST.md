@@ -29,18 +29,19 @@ The consolidated Android code is on `main`. Google account backup was added afte
 
 ## Verification included
 
-45 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components. Drive tests cover native OAuth configuration, canceled sign-in, scoped paginated requests, account isolation, verified uploads, network failures, restore guards and automatic-backup opt-in/deduplication. Real Google account access and Keystore device behavior still require physical-device acceptance.
+44 automated tests including real SQLite transactions via a Python adapter: restore rollback, index integrity, recurrence retry, debt transfers, separate ledgers and receipt round trips. TypeScript check and Android release build. CI also runs a fresh-install Android emulator onboarding, initial modal scrolling and transaction-save check. A JSX regression check rejects raw text outside React Native Text components. Drive tests cover native OAuth configuration, canceled sign-in, scoped requests, account identity, upload verification, failed restores, safe automatic restore on empty ledgers, and preservation of older archives. Real Google account access and Keystore device behavior still require physical-device acceptance.
 
 ## Acceptance work still required
 
 These must not be described as completed production features:
 
-- Google Cloud project setup (Drive API, consent/test users, package/signing registration) and real-account Google sign-in/upload/download must be validated on a signed device. Account-bound encrypted snapshots and foreground automatic backup are implemented; simultaneous device edits are not merged. Drive versions are retained; no automatic pruning is performed.
+- Google Cloud project setup (Drive API, consent/test users, package/signing registration) and real-account Google sign-in/upload/download must be validated on a signed device. Account-protected password-free Google snapshots and native midnight background backup are implemented; simultaneous device edits are not merged. Drive versions are retained; no automatic pruning is performed.
 - iOS native project/build and VoiceOver/native permission validation: not part of this Android APK.
 - Phase 3 simultaneous multi-device sync/conflict resolution: requires a backend and a defined key-sharing protocol; no service is fabricated.
 - Store publication, owner contact/privacy URL, production signing secrets, live AdMob IDs/messages and store disclosures: require owner configuration. PRIVACY-POLICY.md is a review draft, not a published legal policy.
 - Physical-device notification timing, large-text/TalkBack journeys, receipt picker and biometrics must be tested on supported devices.
 - 100,000-record performance targets on a named mid-range phone remain unmeasured. Ledger calculations still load records into memory; indexes alone do not prove latency targets.
+- Five Java scheduling tests and four Android device tests cover midnight/DST, native snapshot receipts, safe path handling and scheduled-job cancellation. Real-account access, overnight device behavior and power-management delays still need acceptance.
 - Background automatic entry is intentionally not promised. Automatic recurrence catches up on open; local alerts can be delayed by Android.
 - Live SQLite storage is not encrypted at rest. App lock and encrypted exports do not change that.
 - Backups and scheduled local reminders are per selected currency ledger. Notification threshold markers are retained across switches. Recovery copies remain private plaintext; encrypted exports are the portable recovery method.

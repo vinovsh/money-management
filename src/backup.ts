@@ -74,3 +74,12 @@ export async function exportCSV(ledger:Snapshot['data']){
 
 export async function safetyCopies(){const files=await RNFS.readDir(RNFS.DocumentDirectoryPath);return files.filter(f=>f.name.startsWith('pre-restore-')&&f.name.endsWith('.json')).map(f=>({path:f.path,date:f.mtime?.toISOString()||f.name})).sort((a,b)=>b.date.localeCompare(a.date));}
 export async function readSafetyCopy(path:string){if(!path.startsWith(RNFS.DocumentDirectoryPath+'/pre-restore-'))throw new Error('Invalid recovery path.');const stat=await RNFS.stat(path);if(Number(stat.size)>MAX_BYTES)throw new Error('Recovery copy exceeds the size limit.');return validateSnapshot(JSON.parse(await RNFS.readFile(path,'utf8')));}
+
+// Password-free snapshots are private Google app-data, protected by account access.
+// Keep the encrypted format APIs above for existing local and older archives.
+export async function readSimpleGoogleSnapshot(file:DriveFile,accountId:string):Promise<Snapshot>{
+ if(!file.size||!Number.isFinite(Number(file.size))||Number(file.size)>MAX_BYTES)throw new Error('Backup size is unavailable or exceeds the 25 MB limit.');
+ const response=await driveRequest(accountId,`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}?alt=media`);
+ const text=await response.text();if(text.length>MAX_BYTES)throw new Error('Backup exceeds the 25 MB limit.');
+ try{return validateSnapshot(JSON.parse(text));}catch{throw new Error('This Google backup is damaged or needs a newer app. Your local data is unchanged.');}
+}

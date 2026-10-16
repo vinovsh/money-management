@@ -91,6 +91,17 @@ class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactC
     }
     init { context.addActivityEventListener(listener) }
     override fun getName() = "LocalFeatures"
+    private fun backupJob(promise: Promise, operation: () -> String) {
+        Thread { try { promise.resolve(operation()) } catch (e: Exception) { promise.reject("GOOGLE_BACKUP", e.message, e) } }.start()
+    }
+    @ReactMethod fun googleBackupConfigure(account: String, email: String, db: String, currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.configure(context, account, email, db, currency); GoogleDailyBackup.status(context, currency) } }
+    @ReactMethod fun googleBackupAccept(currency: String, remote: String, timestamp: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.accept(context, currency, remote, timestamp); GoogleDailyBackup.status(context, currency) } }
+    @ReactMethod fun googleBackupPause(currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.pause(context, currency); "true" } }
+    @ReactMethod fun googleBackupStatus(currency: String, promise: Promise) { promise.resolve(GoogleDailyBackup.status(context, currency)) }
+    @ReactMethod fun googleBackupList(account: String, currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.discover(context, account, currency) } }
+    @ReactMethod fun googleBackupRun(promise: Promise) { backupJob(promise) { GoogleDailyBackup.perform(context) } }
+    @ReactMethod fun googleBackupDisconnect(promise: Promise) { backupJob(promise) { GoogleDailyBackup.disconnect(context); "true" } }
+    @ReactMethod fun googleBackupReschedule(promise: Promise) { GoogleDailyBackup.schedule(context); promise.resolve(true) }
     // Recovery passphrases for optional automatic backups are device-local only.
     // AES-GCM authenticates the value and its account/ledger storage key.
     private fun driveKey(): javax.crypto.SecretKey {
