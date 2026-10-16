@@ -65,7 +65,7 @@ The GitHub Actions workflow creates a bundled, signed development release APK un
 
 For a local build, obtain the official Gradle 8.10.2 wrapper JAR at `android/gradle/wrapper/gradle-wrapper.jar`, configure the Android SDK path, and generate/provide a development keystore matching `android/app/build.gradle`. Then run `npm run apk`. For Metro development, use `npm start` and `npm run android`; a debug manifest allowing local HTTP traffic may be needed for device/Metro connectivity.
 
-## Google account backup (0.6.0)
+## Google account backup (0.7.0)
 
 More → Backup & restore opens a compact Google-branded card with Continue with Google, last backup time, Back up now, Restore from Google and Disconnect. The same card is in Settings. New Google backups require no separate password. Signing in discovers the latest account backup for the selected currency. Empty ledgers restore automatically; meaningful local financial data requires an explicit restore/keep-local choice. A local safety copy precedes restore. A newer remote version pauses uploads for review instead of silently replacing device edits. Each currency ledger registers its database separately with the same connected account. Versions remain in Drive; no automatic pruning occurs.
 
@@ -96,3 +96,7 @@ This is a first Android build, not the entire multi-phase specification. Product
 ## Walletway 0.4.1
 
 More → Guide provides offline instructions for recording and editing transactions, calendar, reports, categories, budgets, goals, recurring entries, debts, appearance, notifications, security and local backups. Home uses Google test banners without additional captions or ad controls. Google consent gating remains in place for SDK ads. The consolidated Android implementation is on main; production configuration and other pending items remain documented in UAT-CHECKLIST.md.
+
+
+## Google sync (0.7.0)
+One private Google Drive app-data file contains all currency ledgers and is updated in place. Connecting automatically restores saved records, including when local records exist. Internal pre-restore safety copies protect interrupted restores; there are no local backup or restore controls. Existing app-owned Google archives are consolidated and removed only after verifying the new file, with concurrent changes preserved. Older encrypted archives remain opaque inside the consolidated file. Daily sync is scheduled at local midnight; Android may delay execution. Conflicting changes from another device require reconnecting before uploads resume. Real-account consent, upload and reinstall restoration must be verified on a configured Google-enabled phone.

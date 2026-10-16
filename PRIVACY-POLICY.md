@@ -15,3 +15,7 @@ This build uses Google test banners without extra ad controls. For these banners
 Deleting the selected ledger removes its records and referenced receipts, while other currency ledgers remain. Uninstalling can remove device-local records. Export each ledger regularly if you need portable recovery. Recovery copies are private local plaintext and are not a substitute for an encrypted export.
 
 Owner contact: to be supplied before publication.
+
+
+## Google sync (0.7.0)
+One private Google Drive app-data file contains all currency ledgers and is updated in place. Connecting automatically restores saved records, including when local records exist. Internal pre-restore safety copies protect interrupted restores; there are no local backup or restore controls. Existing app-owned Google archives are consolidated and removed only after verifying the new file, with concurrent changes preserved. Older encrypted archives remain opaque inside the consolidated file. Daily sync is scheduled at local midnight; Android may delay execution. Conflicting changes from another device require reconnecting before uploads resume. Real-account consent, upload and reinstall restoration must be verified on a configured Google-enabled phone.

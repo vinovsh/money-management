@@ -1,11 +1,10 @@
 import {NativeModules} from 'react-native';
 import * as Backup from './backup';
 import * as Store from './store';
-import {CATEGORY_SEEDS} from './domain.cjs';
+import {CATEGORY_SEEDS,validateSnapshot} from './domain.cjs';
 import type {Ledger,Snapshot} from './models';
 const native=NativeModules.LocalFeatures;
 type Status={accountId:string;email:string;ready:boolean;registered:boolean;lastBackup:string;error:string;nextBackup:string};
-export type Selection={snapshot:Snapshot;accountId:string;fileId:string};
 let running=false;let message='';const listeners=new Set<()=>void>();
 export const subscribe=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
 const emit=()=>listeners.forEach(fn=>fn());
@@ -14,23 +13,33 @@ async function exclusive<T>(fn:()=>Promise<T>){if(running)throw new Error('Pleas
 export async function state(currency:string):Promise<Status>{return JSON.parse(await native.googleBackupStatus(currency));}
 export async function getAccount(currency:string){const s=await state(currency);return s.accountId?{id:s.accountId,email:s.email}:null;}
 export function hasLocalData(ledger:Ledger){return !!(ledger.transactions.length||ledger.budgets.length||ledger.goals.length||ledger.notes.length||ledger.accounts.some(a=>a.opening!==0||!['cash','cash-default','card-default','bank-default'].includes(a.id))||ledger.categories.some(c=>{const seed=CATEGORY_SEEDS.find((s:{id:string})=>s.id===c.id);return !seed||seed.name!==c.name||seed.icon!==c.icon;})||(ledger.settings.templates||[]).length||(ledger.settings.recurring||[]).length||(ledger.settings.debts||[]).length);}
-async function files(accountId:string,currency:string):Promise<Backup.DriveFile[]>{return JSON.parse(await native.googleBackupList(accountId,currency));}
-async function restoreSelected(selected:Selection){const a=await Backup.currentGoogle();if(!a||a.id!==selected.accountId)throw new Error('Google account changed. Connect again.');const ledger=await Store.loadLedger();if(ledger.settings.currency!==selected.snapshot.data.settings.currency)throw new Error('Switch to the backup currency before restoring.');await native.googleBackupPause(ledger.settings.currency);await Backup.safetySnapshot();await Store.restore(selected.snapshot);await native.googleBackupAccept(ledger.settings.currency,selected.fileId,selected.snapshot.createdAt);}
+type Remote={fileId:string;revision:string;bundle:{format:string;version:number;updatedAt:string;activeCurrency:string;ledgers:Record<string,Snapshot>;legacyArchives:unknown[]}};
 export async function connect(ledger:Ledger){return exclusive(async()=>{
  const a=await Backup.connectGoogle();await native.googleBackupConfigure(a.id,a.email,Store.activeLedgerDatabase(),ledger.settings.currency);
- const found=(await files(a.id,ledger.settings.currency)).find(f=>f.appProperties?.currency===ledger.settings.currency);
- if(found){await native.googleBackupPause(ledger.settings.currency);const selected={snapshot:await Backup.readSimpleGoogleSnapshot(found,a.id),accountId:a.id,fileId:found.id};
-  if(!hasLocalData(await Store.loadLedger())){await restoreSelected(selected);return {restored:true,selection:null,legacy:false};}
-  return {restored:false,selection:selected,legacy:false};
+ const remote:Remote=JSON.parse(await native.googleSyncRead(a.id));const bundle=remote.bundle;
+ if(bundle?.format!=='walletway-google-sync'||bundle.version!==1||!bundle.ledgers||typeof bundle.ledgers!=='object'||Array.isArray(bundle.ledgers))throw new Error('Unsupported Google sync data. No local records were changed.');
+ const currencies=Object.keys(bundle.ledgers);
+ for(const currency of currencies){validateSnapshot(bundle.ledgers[currency]);if(!['USD','INR','EUR','GBP','AUD','CAD'].includes(currency)||bundle.ledgers[currency].data.settings.currency!==currency)throw new Error('Google ledger currency does not match. No local records were changed.');}
+ if(!currencies.length&&bundle.legacyArchives?.length&&!hasLocalData(ledger))throw new Error('This account only has an older encrypted archive. Connect from the phone that still has your records to migrate them. The archive is preserved.');
+ const original=ledger.settings.currency;const saved:Record<string,Snapshot>={};let restored=false;
+ if(currencies.length){
+  const profiles=await Store.ledgerProfiles();
+  try{
+   // Validate every cloud ledger first, then protect every existing ledger before replacing any.
+   for(const profile of profiles.items){await Store.switchLedger(profile.currency);saved[profile.currency]=await Store.snapshot();await Backup.safetySnapshot();}
+   const current=await Backup.currentGoogle();if(!current||current.id!==a.id)throw new Error('Google account changed. Connect again.');
+   for(const currency of currencies){await Store.switchLedger(currency);await Store.restore(bundle.ledgers[currency]);}
+   restored=true;
+  }catch(error){
+   for(const [currency,snapshot] of Object.entries(saved)){await Store.switchLedger(currency);await Store.restore(snapshot);}
+   await Store.switchLedger(original);throw error;
+  }
  }
- // Old passphrase archives cannot be decrypted on a new device without their key.
- const legacy=(await Backup.googleSnapshots(a.id)).some(f=>f.appProperties?.currency===ledger.settings.currency||(!f.appProperties?.currency&&f.name.includes(ledger.settings.datasetId)));
- if(legacy){await native.googleBackupPause(ledger.settings.currency);return {restored:false,selection:null,legacy:true};}
- await native.googleBackupAccept(ledger.settings.currency,'','');await native.googleBackupRun();return {restored:false,selection:null,legacy:false};
+ await Store.switchLedger(currencies.includes(bundle.activeCurrency)?bundle.activeCurrency:original);
+ const profiles=await Store.ledgerProfiles();const paths=Object.fromEntries(profiles.items.map(p=>[p.currency,p.id]));
+ await native.googleSyncRegister(JSON.stringify(paths),(await Store.loadLedger()).settings.currency);
+ await native.googleSyncFinish(remote.fileId,remote.revision,bundle.updatedAt||'');
+ await native.googleBackupRun();return {restored};
  });}
-export async function discover(ledger:Ledger){return exclusive(async()=>{const s=await state(ledger.settings.currency);if(!s.accountId)return null;const found=(await files(s.accountId,ledger.settings.currency)).find(f=>f.appProperties?.currency===ledger.settings.currency);if(!found)return null;return {snapshot:await Backup.readSimpleGoogleSnapshot(found,s.accountId),accountId:s.accountId,fileId:found.id};});}
-export async function restore(selected:Selection){return exclusive(()=>restoreSelected(selected));}
-export async function keepLocal(ledger:Ledger,selected:Selection|null){return exclusive(async()=>{const s=await state(ledger.settings.currency);if(!s.accountId)throw new Error('Connect Google first.');if(selected&&selected.accountId!==s.accountId)throw new Error('Google account changed. Connect again.');if(!selected&&(await files(s.accountId,ledger.settings.currency)).some(f=>f.appProperties?.currency===ledger.settings.currency))throw new Error('A Google backup exists. Tap Restore from Google to review it first.');await native.googleBackupAccept(ledger.settings.currency,selected?.fileId||'',selected?.snapshot.createdAt||'');await native.googleBackupRun();});}
-export async function upload(){return exclusive(()=>native.googleBackupRun());}
 export async function disconnect(){return exclusive(async()=>{await native.googleBackupDisconnect();await Backup.disconnectGoogle();});}
-export async function automatic(_ledger:Ledger){try{await native.googleBackupReschedule();}catch{/* Existing local transactions never depend on scheduling. */}}
+export async function automatic(ledger:Ledger){try{if(running)return;const info=await state(ledger.settings.currency);if(info.accountId){const profiles=await Store.ledgerProfiles();await native.googleSyncRegister(JSON.stringify(Object.fromEntries(profiles.items.map(p=>[p.currency,p.id]))),ledger.settings.currency);}await native.googleBackupReschedule();}catch{/* Local transactions do not depend on network availability. */}}

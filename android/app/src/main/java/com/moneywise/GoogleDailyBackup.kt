@@ -14,8 +14,10 @@ import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.*
@@ -23,7 +25,7 @@ import java.util.concurrent.TimeUnit
 
 object GoogleDailyBackup {
     const val TAG = "walletway-google-midnight"
-    private const val FORMAT = "walletway-google-v1"
+    private const val FORMAT = "walletway-google-sync-v1"
     private const val SCOPE = "https://www.googleapis.com/auth/drive.appdata"
     private const val LIMIT = 25 * 1024 * 1024
     private val lock = Any()
@@ -42,38 +44,101 @@ object GoogleDailyBackup {
         if (result.hasResolution() || result.accessToken.isNullOrBlank()) throw IllegalStateException("Open Walletway and reconnect Google to allow Drive backups.")
         return result.accessToken!!
     }
-    private fun request(c: Context, account: String, token: String, url: String, method: String = "GET", body: ByteArray? = null, type: String = "application/json"): ByteArray {
+    private val http = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).callTimeout(90, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build()
+    private fun request(c: Context, account: String, token: String, url: String, method: String = "GET", body: ByteArray? = null, type: String = "application/json", etag: String = "", headers: MutableMap<String,String>? = null): ByteArray {
         active(c, account)
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 30000; connection.readTimeout = 60000; connection.instanceFollowRedirects = false
-        connection.requestMethod = method; connection.setRequestProperty("Authorization", "Bearer $token")
-        try {
-            if (body != null) { connection.doOutput = true; connection.setFixedLengthStreamingMode(body.size); connection.setRequestProperty("Content-Type", type); connection.outputStream.use { it.write(body) } }
-            val code = connection.responseCode
-            if (code == 401 || code == 403) throw IllegalStateException("Google backup permission expired. Reconnect Google and check Drive API access.")
-            if (code !in 200..299) throw IOException("Google Drive is unavailable ($code). Your previous backup is kept.")
-            return connection.inputStream.use { input ->
+        val builder = Request.Builder().url(url).header("Authorization", "Bearer $token")
+        if (etag.isNotEmpty()) builder.header("If-Match", etag)
+        builder.method(method, body?.toRequestBody(type.toMediaType()))
+        http.newCall(builder.build()).execute().use { response ->
+            if (response.code == 401 || response.code == 403) throw IllegalStateException("Reconnect Google to allow account sync.")
+            if (response.code == 412) throw IllegalStateException("Google data changed on another device. Reconnect to restore the latest data.")
+            if (!response.isSuccessful) throw IOException("Google sync is unavailable (${response.code}). Phone data is unchanged.")
+            response.header("ETag")?.let { headers?.put("etag", it) }
+            if (response.code == 204) return ByteArray(0)
+            return response.body!!.byteStream().use { input ->
                 val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
-                while (true) { val count = input.read(buffer); if (count < 0) break; if (output.size() + count > LIMIT) throw IOException("Backup exceeds the 25 MB limit."); output.write(buffer, 0, count) }
+                while (true) { val count = input.read(buffer); if (count < 0) break; if (output.size() + count > LIMIT) throw IOException("Sync data exceeds the 25 MB limit."); output.write(buffer, 0, count) }
                 output.toByteArray()
             }
-        } finally { connection.disconnect() }
+        }
     }
-    private fun list(c: Context, account: String, token: String, currency: String): JSONArray {
-        require(currency in listOf("USD", "INR", "EUR", "GBP", "AUD", "CAD"))
-        val query = encode("trashed = false and appProperties has { key='format' and value='$FORMAT' } and appProperties has { key='currency' and value='$currency' }")
-        val fields = encode("files(id,name,createdTime,size,appProperties)")
-        val response = JSONObject(String(request(c, account, token, "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=$query&fields=$fields&orderBy=createdTime%20desc&pageSize=1"), Charsets.UTF_8))
-        return response.optJSONArray("files") ?: JSONArray()
+    private fun ownedFiles(c: Context, account: String, token: String): List<JSONObject> {
+        val query = encode("trashed = false and (appProperties has { key='format' and value='$FORMAT' } or appProperties has { key='format' and value='walletway-google-v1' } or appProperties has { key='format' and value='moneywise-v1' })")
+        val fields = encode("nextPageToken,files(id,name,createdTime,modifiedTime,version,size,appProperties)")
+        val files = mutableListOf<JSONObject>(); var page = ""
+        do {
+            val suffix = if (page.isEmpty()) "" else "&pageToken=${encode(page)}"
+            val response = JSONObject(String(request(c, account, token, "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=$query&fields=$fields&orderBy=modifiedTime%20desc&pageSize=100$suffix"), Charsets.UTF_8))
+            val batch = response.optJSONArray("files") ?: JSONArray(); for (i in 0 until batch.length()) files.add(batch.getJSONObject(i))
+            page = response.optString("nextPageToken", "")
+        } while (page.isNotEmpty())
+        return files
     }
-    fun discover(c: Context, account: String, currency: String): String = synchronized(lock) { list(c, account, access(c, account), currency).toString() }
-    fun configure(c: Context, account: String, email: String, db: String, currency: String) {
+    private fun metadata(c: Context, account: String, token: String, id: String, headers: MutableMap<String,String>? = null): JSONObject = JSONObject(String(request(c, account, token, "https://www.googleapis.com/drive/v3/files/${encode(id)}?fields=id,version,modifiedTime", headers = headers), Charsets.UTF_8))
+    private fun download(c: Context, account: String, token: String, id: String): JSONObject = JSONObject(String(request(c, account, token, "https://www.googleapis.com/drive/v3/files/${encode(id)}?alt=media"), Charsets.UTF_8))
+    private fun cloud(c: Context, account: String, token: String): JSONObject {
+        val files = ownedFiles(c, account, token)
+        val canonical = files.filter { it.getJSONObject("appProperties").optString("format") == FORMAT }.minByOrNull { it.optString("createdTime") + it.getString("id") }
+        val sources = JSONObject(); val entries = JSONObject(); val legacy = JSONArray(); val encryptedIds = mutableSetOf<String>()
+        var activeCurrency = ""; var timestamp = ""; var canonicalVersion = ""; var canonicalTag = ""
+        for (file in files) {
+            val id = file.getString("id"); val headers = mutableMapOf<String,String>()
+            val before = metadata(c, account, token, id, headers)
+            val value = download(c, account, token, id)
+            val after = metadata(c, account, token, id)
+            check(before.getString("version") == after.getString("version")) { "Google data changed while downloading. Reconnect to retry." }
+            sources.put(id, after.getString("version"))
+            val format = file.getJSONObject("appProperties").getString("format")
+            if (format == FORMAT) {
+                require(value.optString("format") == "walletway-google-sync" && value.optInt("version") == 1) { "Unsupported Google sync data. Update the app." }
+                val remote = value.getJSONObject("ledgers")
+                for (currency in remote.keys()) if (!entries.has(currency)) entries.put(currency, remote.getJSONObject(currency))
+                val old = value.optJSONArray("legacyArchives") ?: JSONArray()
+                for (i in 0 until old.length()) { val archive = old.getJSONObject(i); if (encryptedIds.add(archive.getString("sourceId"))) legacy.put(archive) }
+                if (activeCurrency.isEmpty()) activeCurrency = value.optString("activeCurrency")
+                if (timestamp.isEmpty()) timestamp = value.optString("updatedAt")
+                if (canonical?.getString("id") == id) { canonicalVersion = after.getString("version"); canonicalTag = headers["etag"] ?: "" }
+            } else if (format == "walletway-google-v1") {
+                require(value.optString("format") == "moneywise-backup" && value.optInt("version") == 2) { "An older Google file is damaged. No data was removed." }
+                val currency = value.getJSONObject("data").getJSONObject("settings").getString("currency")
+                if (!entries.has(currency)) entries.put(currency, value)
+                if (timestamp.isEmpty()) timestamp = value.getString("createdAt")
+                if (activeCurrency.isEmpty()) activeCurrency = currency
+            } else {
+                // Preserve opaque older encrypted archives inside the single file.
+                // They are never deleted until that consolidated payload is verified.
+                if (encryptedIds.add(id)) legacy.put(JSONObject().put("sourceId", id).put("name", file.optString("name")).put("data", value))
+            }
+        }
+        val bundle = JSONObject().put("format", "walletway-google-sync").put("version", 1).put("updatedAt", timestamp).put("activeCurrency", activeCurrency).put("ledgers", entries).put("legacyArchives", legacy)
+        require(bundle.toString().toByteArray(Charsets.UTF_8).size <= LIMIT) { "Google data is too large to consolidate safely. Existing files were kept." }
+        return JSONObject().put("fileId", canonical?.getString("id") ?: "").put("revision", canonicalVersion).put("etag", canonicalTag).put("sources", sources).put("bundle", bundle)
+    }
+    fun readSync(c: Context, account: String): String = synchronized(lock) { cloud(c, account, access(c, account)).toString() }
+    fun register(c: Context, paths: String, activeCurrency: String) = synchronized(lock) {
+        val items = JSONObject(paths); require(items.length() in 1..6)
+        for (currency in items.keys()) { require(currency in listOf("USD", "INR", "EUR", "GBP", "AUD", "CAD")); require(Regex("moneywise(?:-[A-Z]{3})?\\.db").matches(items.getString(currency))) }
+        val p = prefs(c); val previous = JSONObject(p.getString("ledgers", "{}")!!)
+        val editor = p.edit().putString("ledgers", items.toString()).putString("activeCurrency", activeCurrency)
+        if (p.getBoolean("syncReady", false)) for (currency in items.keys()) if (!previous.has(currency)) editor.putBoolean("ready-$currency", true)
+        check(editor.commit())
+    }
+    fun finish(c: Context, fileId: String, revision: String, timestamp: String) = synchronized(lock) {
+        val p = prefs(c); val editor = p.edit().putString("syncFile", fileId).putString("syncRevision", revision).putBoolean("syncReady", true).remove("error")
+        val paths = JSONObject(p.getString("ledgers", "{}")!!)
+        for (currency in paths.keys()) { editor.putBoolean("ready-$currency", true); if (timestamp.isNotEmpty()) editor.putString("last-$currency", timestamp) }
+        check(editor.commit()); schedule(c)
+    }
+    fun configure(c: Context, account: String, email: String, db: String, currency: String) = synchronized(lock) {
         val user = identity(c, account); require(user.email == email) { "Google account changed." }
         require(Regex("moneywise(?:-[A-Z]{3})?\\.db").matches(db)) { "Invalid ledger path" }
         require(currency in listOf("USD", "INR", "EUR", "GBP", "AUD", "CAD")) { "Unsupported currency" }
         val p = prefs(c)
         if (p.getString("accountId", "") != account) { WorkManager.getInstance(c).cancelAllWorkByTag(TAG); p.edit().clear().commit() }
         val ledgers = JSONObject(p.getString("ledgers", "{}")!!)
+        for (entry in ledgers.keys()) p.edit().putBoolean("ready-$entry", false).commit()
+        p.edit().putBoolean("syncReady", false).commit()
         ledgers.put(currency, db)
         check(p.edit().putString("accountId", account).putString("email", email).putString("ledgers", ledgers.toString()).commit())
         schedule(c)
@@ -130,32 +195,55 @@ object GoogleDailyBackup {
     }
     fun perform(c: Context): String = synchronized(lock) {
         val p = prefs(c); val account = p.getString("accountId", "")!!; require(account.isNotEmpty()) { "Connect Google first." }
-        val token = access(c, account); val ledgers = JSONObject(p.getString("ledgers", "{}")!!)
-        var uploaded = 0
-        for (currency in ledgers.keys()) {
+        check(p.getBoolean("syncReady", false)) { "Reconnect Google to restore account data first." }
+        val token = access(c, account); val remote = cloud(c, account, token)
+        check(remote.getString("fileId") == p.getString("syncFile", "") && remote.getString("revision") == p.getString("syncRevision", "")) { "Google data changed on another device. Reconnect to load the latest data." }
+        val bundle = remote.getJSONObject("bundle"); val entries = bundle.getJSONObject("ledgers")
+        val paths = JSONObject(p.getString("ledgers", "{}")!!); val included = mutableListOf<String>()
+        for (currency in paths.keys()) {
             if (!p.getBoolean("ready-$currency", false)) continue
-            val files = list(c, account, token, currency)
-            val latest = (0 until files.length()).map { files.getJSONObject(it) }.firstOrNull { it.optJSONObject("appProperties")?.optString("currency") == currency }
-            if ((latest?.optString("id") ?: "") != p.getString("remote-$currency", "")) {
-                p.edit().putBoolean("ready-$currency", false).commit(); throw IllegalStateException("A newer $currency backup was found. Open Backup and restore it or keep this phone’s data.")
-            }
-            val snap = snapshot(c, ledgers.getString(currency)); require(snap.getJSONObject("data").getJSONObject("settings").getString("currency") == currency)
-            // Local deletion pauses this ledger before clearing SQLite. Recheck after
-            // capturing it so an in-flight job cannot upload a freshly emptied ledger.
+            val snap = snapshot(c, paths.getString(currency))
+            require(snap.getJSONObject("data").getJSONObject("settings").getString("currency") == currency)
             if (!p.getBoolean("ready-$currency", false)) continue
-            val content = snap.toString(); val bytes = content.toByteArray(Charsets.UTF_8); require(bytes.size <= LIMIT) { "Backup exceeds the 25 MB limit." }
-            val boundary = "walletway_${UUID.randomUUID()}"
-            val metadata = JSONObject().put("name", "walletway-$currency-${System.currentTimeMillis()}.json").put("parents", JSONArray().put("appDataFolder"))
-                .put("appProperties", JSONObject().put("format", FORMAT).put("currency", currency).put("datasetId", snap.getJSONObject("data").getJSONObject("settings").getString("datasetId")))
-            val body = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$metadata\r\n--$boundary\r\nContent-Type: application/json\r\n\r\n$content\r\n--$boundary--\r\n"
-            val created = JSONObject(String(request(c, account, token, "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", "POST", body.toByteArray(Charsets.UTF_8), "multipart/related; boundary=$boundary"), Charsets.UTF_8)).getString("id")
-            val verified = request(c, account, token, "https://www.googleapis.com/drive/v3/files/${encode(created)}?alt=media")
-            check(bytes.contentEquals(verified)) { "Backup verification failed. Previous backups are kept." }
-            active(c, account)
-            check(p.edit().putString("remote-$currency", created).putString("last-$currency", snap.getString("createdAt")).remove("error").commit()); uploaded++
+            entries.put(currency, snap); included.add(currency)
         }
-        JSONObject().put("uploaded", uploaded).toString()
+        if (included.isEmpty()) return "{}"
+        bundle.put("updatedAt", iso(System.currentTimeMillis())).put("activeCurrency", p.getString("activeCurrency", included.first()))
+        val content = bundle.toString().toByteArray(Charsets.UTF_8); require(content.size <= LIMIT) { "Sync data exceeds the 25 MB limit." }
+        var id = remote.getString("fileId")
+        if (id.isEmpty()) {
+            val boundary = "walletway_${UUID.randomUUID()}"
+            val meta = JSONObject().put("name", "Walletway-sync.json").put("parents", JSONArray().put("appDataFolder")).put("appProperties", JSONObject().put("format", FORMAT))
+            val body = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n--$boundary\r\nContent-Type: application/json\r\n\r\n${String(content, Charsets.UTF_8)}\r\n--$boundary--\r\n"
+            id = JSONObject(String(request(c, account, token, "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", "POST", body.toByteArray(Charsets.UTF_8), "multipart/related; boundary=$boundary"), Charsets.UTF_8)).getString("id")
+        } else {
+            val current = metadata(c, account, token, id)
+            check(current.getString("version") == remote.getString("revision")) { "Google data changed. Reconnect before syncing." }
+            check(remote.getString("etag").isNotEmpty()) { "Google did not provide a safe update token. Reconnect to retry." }
+            request(c, account, token, "https://www.googleapis.com/upload/drive/v3/files/${encode(id)}?uploadType=media&fields=id", "PATCH", content, etag = remote.getString("etag"))
+        }
+        val verified = request(c, account, token, "https://www.googleapis.com/drive/v3/files/${encode(id)}?alt=media")
+        check(content.contentEquals(verified)) { "Google sync verification failed. Local data is kept." }
+        val finalMeta = metadata(c, account, token, id)
+        active(c, account)
+        val editor = p.edit().putString("syncFile", id).putString("syncRevision", finalMeta.getString("version")).remove("error")
+        for (currency in included) editor.putString("last-$currency", bundle.getString("updatedAt"))
+        check(editor.commit())
+        // Only remove files whose data was included in the verified consolidated file.
+        // If another device changed one in the meantime, leave it for the next sync.
+        val originals = ownedFiles(c, account, token)
+        for (file in originals) {
+            if (file.getString("id") == id) continue
+            val source = file.getString("id")
+            val sources = remote.getJSONObject("sources")
+            if (!sources.has(source)) continue
+            val headers = mutableMapOf<String,String>(); val current = metadata(c, account, token, source, headers)
+            if (current.getString("version") != sources.getString(source) || headers["etag"].isNullOrEmpty()) continue
+            request(c, account, token, "https://www.googleapis.com/drive/v3/files/${encode(source)}", "DELETE", etag = headers["etag"] ?: "")
+        }
+        return JSONObject().put("fileId", id).put("updatedAt", bundle.getString("updatedAt")).toString()
     }
+
 }
 class GoogleBackupWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {

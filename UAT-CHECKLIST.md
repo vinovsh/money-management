@@ -45,3 +45,7 @@ These must not be described as completed production features:
 - Background automatic entry is intentionally not promised. Automatic recurrence catches up on open; local alerts can be delayed by Android.
 - Live SQLite storage is not encrypted at rest. App lock and encrypted exports do not change that.
 - Backups and scheduled local reminders are per selected currency ledger. Notification threshold markers are retained across switches. Recovery copies remain private plaintext; encrypted exports are the portable recovery method.
+
+
+## Google sync (0.7.0)
+One private Google Drive app-data file contains all currency ledgers and is updated in place. Connecting automatically restores saved records, including when local records exist. Internal pre-restore safety copies protect interrupted restores; there are no local backup or restore controls. Existing app-owned Google archives are consolidated and removed only after verifying the new file, with concurrent changes preserved. Older encrypted archives remain opaque inside the consolidated file. Daily sync is scheduled at local midnight; Android may delay execution. Conflicting changes from another device require reconnecting before uploads resume. Real-account consent, upload and reinstall restoration must be verified on a configured Google-enabled phone.

@@ -98,7 +98,9 @@ class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactC
     @ReactMethod fun googleBackupAccept(currency: String, remote: String, timestamp: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.accept(context, currency, remote, timestamp); GoogleDailyBackup.status(context, currency) } }
     @ReactMethod fun googleBackupPause(currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.pause(context, currency); "true" } }
     @ReactMethod fun googleBackupStatus(currency: String, promise: Promise) { promise.resolve(GoogleDailyBackup.status(context, currency)) }
-    @ReactMethod fun googleBackupList(account: String, currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.discover(context, account, currency) } }
+    @ReactMethod fun googleSyncRead(account: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.readSync(context, account) } }
+    @ReactMethod fun googleSyncRegister(paths: String, currency: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.register(context, paths, currency); "true" } }
+    @ReactMethod fun googleSyncFinish(file: String, revision: String, timestamp: String, promise: Promise) { backupJob(promise) { GoogleDailyBackup.finish(context, file, revision, timestamp); "true" } }
     @ReactMethod fun googleBackupRun(promise: Promise) { backupJob(promise) { GoogleDailyBackup.perform(context) } }
     @ReactMethod fun googleBackupDisconnect(promise: Promise) { backupJob(promise) { GoogleDailyBackup.disconnect(context); "true" } }
     @ReactMethod fun googleBackupReschedule(promise: Promise) { GoogleDailyBackup.schedule(context); promise.resolve(true) }
