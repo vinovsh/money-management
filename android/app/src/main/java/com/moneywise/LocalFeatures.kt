@@ -14,7 +14,6 @@ import com.facebook.react.bridge.*
 import com.facebook.react.ReactPackage
 import com.facebook.react.uimanager.ViewManager
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.util.Calendar
 
@@ -72,11 +71,32 @@ class ReminderReceiver : BroadcastReceiver() {
 }
 class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private var pending: Promise? = null
+    private var excelPayload: String? = null
     private var authenticating = false
     private val listener = object : BaseActivityEventListener() {
         override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
-            if (requestCode != 871 && requestCode != 872) return
+            if (requestCode !in 871..874) return
             val promise = pending ?: return; pending = null
+            if (requestCode == 873 || requestCode == 874) {
+                val payload = excelPayload; excelPayload = null
+                val uri = data?.data
+                if (resultCode != Activity.RESULT_OK || uri == null) { promise.resolve(null); return }
+                Thread {
+                    try {
+                        if (requestCode == 873) {
+                            val output = context.contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open the selected save location.")
+                            output.use { ExcelBackup.write(it, requireNotNull(payload)) }
+                            promise.resolve(true)
+                        } else {
+                            val input = context.contentResolver.openInputStream(uri) ?: error("Cannot open the selected workbook.")
+                            promise.resolve(input.use { ExcelBackup.read(it) })
+                        }
+                    } catch (e: Exception) {
+                        promise.reject("EXCEL_BACKUP", if (requestCode == 873) "Could not save the Excel backup. Check the save location and try again." else "Could not read this Walletway Excel backup. Use an original, unedited export.", e)
+                    }
+                }.start()
+                return
+            }
             if (requestCode == 872) { promise.resolve(resultCode == Activity.RESULT_OK); return }
             if (resultCode != Activity.RESULT_OK || data?.data == null) { promise.resolve(null); return }
             try {
@@ -91,6 +111,24 @@ class LocalFeaturesModule(private val context: ReactApplicationContext) : ReactC
     }
     init { context.addActivityEventListener(listener) }
     override fun getName() = "LocalFeatures"
+    @ReactMethod fun saveExcelBackup(name: String, snapshot: String, promise: Promise) {
+        if (snapshot.toByteArray(Charsets.UTF_8).size > 25 * 1024 * 1024) {
+            promise.reject("EXCEL_BACKUP", "Backup exceeds the 25 MB limit."); return
+        }
+        pickWorkbook(Intent(Intent.ACTION_CREATE_DOCUMENT).setType(ExcelBackup.MIME).putExtra(Intent.EXTRA_TITLE, name), 873, snapshot, promise)
+    }
+    @ReactMethod fun openExcelBackup(promise: Promise) {
+        pickWorkbook(Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*"), 874, null, promise)
+    }
+    private fun pickWorkbook(intent: Intent, request: Int, snapshot: String?, promise: Promise) {
+        val activity = currentActivity ?: run { promise.reject("ACTIVITY", "Open Walletway to choose a backup file."); return }
+        activity.runOnUiThread {
+            if (pending != null || authenticating) { promise.reject("BUSY", "Finish the current request first."); return@runOnUiThread }
+            pending = promise; excelPayload = snapshot
+            try { activity.startActivityForResult(intent.addCategory(Intent.CATEGORY_OPENABLE), request) }
+            catch (e: Exception) { pending = null; excelPayload = null; promise.reject("EXCEL_BACKUP", "Android could not open the file picker.", e) }
+        }
+    }
     @ReactMethod(isBlockingSynchronousMethod = true) fun uuid(): String = java.util.UUID.randomUUID().toString()
     @ReactMethod fun schedule(json: String, promise: Promise) { try { LocalReminders.save(context, json); promise.resolve(true) } catch (e: Exception) { promise.reject("REMINDER", e.message, e) } }
     @ReactMethod fun notifyOnce(id: String, title: String, body: String, promise: Promise) { try { promise.resolve(LocalReminders.once(context, id, title, body)) } catch (e: Exception) { promise.reject("NOTIFICATION", e.message, e) } }

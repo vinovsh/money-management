@@ -6,12 +6,12 @@ Walletway stores your ledger, categories, accounts, notes, planning records and 
 
 Local reminders use Android notification and alarm services. Permission is requested when you enable reminders or budget alerts. Notification text does not include transaction amounts or account names. Biometrics/screen-lock verification is performed by Android; Walletway does not obtain your biometric templates, PIN or password. The app lock does not encrypt the live SQLite database.
 
-You choose images through the system document picker. A private copy, limited to 5 MB, is stored with your record. Encrypted local backup includes attached receipts up to the combined archive limit. Your recovery passphrase is required to decrypt archives and is not stored by the app. Unencrypted CSV/PDF exports contain financial information; you choose where to share them.
+You choose images through the system document picker. A private copy, limited to 5 MB, is stored with your record. Excel backups include attached receipts. Unencrypted CSV/PDF exports contain financial information; you choose where to share them.
 
-Google backup is not configured for this UAT build. The existing optional adapter can send encrypted snapshots to your private Google Drive app-data folder only after account configuration and explicit user action.
+Excel backups contain a copy of the selected ledger and its receipt data. Walletway uses the Android file picker to read or save a workbook at the location you choose. The workbook is not encrypted. Import requires preview and confirmation before replacing records. Internal app-private safety copies precede replacement. Walletway no longer schedules cloud backups. Existing cloud files are not deleted by this update.
 
-Optional test advertising is disabled by default. If enabled, Google’s consent SDK checks applicable consent before ad SDK initialization and requests test ads. The Google SDK may process device/network information under its own policies. Financial notes, balances, names and amounts are not supplied as ad parameters. Real monetization requires owner AdMob configuration and a reviewed regional consent setup.
+This build uses Google test banners without extra ad controls. For these banners, Google’s consent SDK checks applicable consent before ad SDK initialization and requests test ads. The Google SDK may process device/network information under its own policies. Financial notes, balances, names and amounts are not supplied as ad parameters. Real monetization requires owner AdMob configuration and a reviewed regional consent setup.
 
-Deleting the selected ledger removes its records and referenced receipts, while other currency ledgers remain. Uninstalling can remove device-local records. Export each ledger regularly if you need portable recovery. Recovery copies are private local plaintext and are not a substitute for an encrypted export.
+Deleting the selected ledger removes its records and referenced receipts, while other currency ledgers remain. Uninstalling can remove device-local records. Export an Excel backup for each ledger you want to recover. Internal pre-restore safety copies are private local plaintext and have no user-facing local-backup controls.
 
 Owner contact: to be supplied before publication.

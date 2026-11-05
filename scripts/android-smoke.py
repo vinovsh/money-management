@@ -73,7 +73,7 @@ def find(text):
     candidates.sort(key=lambda n: n.attrib.get('clickable') != 'true')
     for node in candidates:
         x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
-        if y2 > y1 + 4 and y1 > 55 and y2 < height - 45:
+        if y2 > y1 + 4 and y1 > 55 and y2 < height - (5 if text == 'More' else 45):
             return node
     return None
 
@@ -108,3 +108,31 @@ if 'FATAL EXCEPTION' in logs or 'com.facebook.react.common.JavascriptException' 
 with Path('dist/transaction-smoke.png').open('wb') as image:
     subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
 print('Android onboarding, initial modal scroll and transaction save passed.')
+
+# Check the new offline guide and the visible demo ad fallback.
+tap(scroll_to('More'))
+tap(scroll_to('Guide'))
+if not any(n.attrib.get('text') == 'Your Walletway guide' for n in nodes()):
+    raise RuntimeError('Guide did not open from More.')
+tap(scroll_to('Back up and recover'))
+scroll_to('Walletway 0.8.0 · Guide')
+with Path('dist/guide-smoke.png').open('wb') as image:
+    subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
+logs = adb('logcat', '-d')
+Path('dist/launch-smoke.log').write_text(logs)
+if 'FATAL EXCEPTION' in logs or 'com.facebook.react.common.JavascriptException' in logs:
+    raise RuntimeError('The emulator reported a guide-flow crash.')
+print('Offline guide navigation passed.')
+
+# Both entry points expose the Excel file actions.
+adb('shell', 'input', 'keyevent', '4')
+tap(scroll_to('Settings'))
+scroll_to('Export Excel backup')
+scroll_to('Import Excel backup')
+adb('shell', 'input', 'keyevent', '4')
+tap(scroll_to('Backup & restore'))
+scroll_to('Export Excel backup')
+scroll_to('Import Excel backup')
+with Path('dist/excel-backup-smoke.png').open('wb') as image:
+    subprocess.run(['adb', 'exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=30)
+print('Excel backup and import are available in Settings and More.')

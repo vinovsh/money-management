@@ -4,7 +4,7 @@ Version: 1.0 · Status: proposed implementation specification · Date: October 7
 
 ## 1. Product definition
 
-A React Native CLI application for personal money management on Android and iOS. Users can record expenses and income, manage accounts, plan budgets, view statistics, and review spending in a calendar. All core features work without an internet connection or an account. Ads support the free app when online. Optional Google Drive backup protects data across reinstalls and device changes.
+A React Native CLI application for personal money management on Android and iOS. Users can record expenses and income, manage accounts, plan budgets, view statistics, and review spending in a calendar. All core features work without an internet connection or an account. Ads support the free app when online. Excel backups support recovery across reinstalls and device changes.
 
 “Daily experience calculation” is interpreted as daily expense calculation. This document specifies the app; it does not claim that an app or GitHub repository has been created.
 
@@ -34,13 +34,13 @@ This is a personal ledger, not a banking service. Automatic bank imports, paymen
 | Calendar | Daily income/expense totals; tap a date to see its transactions | MVP |
 | Notes | Transaction notes and a separate daily money journal | MVP |
 | Budgets | Overall and category monthly limits; progress and alerts | MVP |
-| Backup | Local export/import and optional encrypted Google Drive snapshots | MVP |
+| Backup | Excel export/import with restore preview | MVP |
 | Ads | Restrained banners/native placements; consent-aware online behavior | MVP |
 | Recurring items | Bills, salary, subscriptions, scheduled reminders | Phase 2 |
 | Goals | Savings targets and explicitly allocated contributions | Phase 2 |
 | Debts | Money lent/borrowed, repayments, due reminders | Phase 2 |
 | Reports | Custom chart sets, comparisons, CSV/PDF exports | Phase 2 |
-| Receipts | Optional photos, attachment limits, encrypted backup inclusion | Phase 2 |
+| Receipts | Optional photos, attachment limits, Excel backup inclusion | Phase 2 |
 | Advanced budgets | Weekly/custom periods, rollover, tag budgets | Phase 2 |
 | Multiple currencies | Separate currency totals and explicit conversion rates | Phase 2 |
 | Device sync | Multi-device change merge with conflict resolution | Phase 3 |
@@ -107,7 +107,7 @@ Use calm neutral surfaces, generous spacing, clear typography, and a restrained 
 1. Choose currency and locale; explain that MVP uses one ledger currency.
 2. Create the first account with an optional opening balance.
 3. Offer an optional daily reminder.
-4. Explain local storage and offer Google backup with a Skip action.
+4. Explain local storage and where to find Excel backup.
 5. Open Home with an Add your first transaction action.
 
 Do not block onboarding on network access or ad loading. Changing the ledger currency after transactions exist must not silently relabel amounts; require an explicit conversion/migration flow or keep that setting locked in MVP.
@@ -126,8 +126,7 @@ Do not block onboarding on network access or ad loading. Changing the ledger cur
 | Forms | React Hook Form and Zod |
 | Charts | Victory Native or an SVG-based chart library; validate accessibility and release-build performance |
 | Secure storage | `react-native-keychain` backed by platform secure storage |
-| Google identity | `@react-native-google-signin/google-signin` with platform OAuth configuration |
-| Backup storage | Google Drive REST API, restricted `drive.appdata` scope |
+| Backup storage | Android Storage Access Framework, Excel workbook |
 | Notifications | Notifee, subject to current platform permission and scheduling rules |
 | Advertising | Google Mobile Ads native SDK through a maintained React Native binding |
 | Dates | A tested timezone-aware date library plus `Intl` formatting |
@@ -143,7 +142,7 @@ UI → use cases → domain rules → repositories → SQLite/native adapters.
 - Domain services handle money, dates, balances, recurrence, budgets, and restore validation.
 - Repositories execute parameterized queries and atomic writes.
 - Native adapters handle secure storage, files, notifications, OAuth, ads, and background scheduling.
-- Backup reads a consistent database snapshot; it never treats Google Drive as the live ledger database.
+- Backup reads a consistent database snapshot; the workbook is a portable copy.
 
 Suggested project layout:
 
@@ -204,58 +203,15 @@ Version schema migrations, run them transactionally where supported, and make a 
 
 ## 6. Offline behavior and durability
 
-Transaction writes commit locally before showing success. Ads, Google sign-in, backup, and optional online features must never block ledger use. Display pending backup changes separately from saved transactions.
+Transaction writes commit locally before showing success. Ads, backup, and optional online features must never block ledger use. Display pending backup changes separately from saved transactions.
 
 Use database transactions, a consistent SQLite snapshot/export mechanism, checksums, and app-private file storage. Do not copy only the SQLite main file while WAL writes are active. Handle low-storage errors without displaying false success. Close/reopen and integrity-check restored databases before using them.
 
 The app works when force-closed and reopened offline. Clearly explain that uninstalling or losing a device can remove local-only data. Expose export and backup from Settings and provide optional, dismissible reminders when backup is disabled.
 
-## 7. Google backup, restore, and future sync
+## 7. Excel backup and restore
 
-### MVP: automatic backup and explicit restore
-
-“Connect Google” means optional Google sign-in and private app-data snapshots in the user’s Google Drive. It does not mean Firebase is required, and signing in alone does not make backup successful. MVP is backup/restore, not concurrent multi-device editing.
-
-Request only the required Drive app-data scope. Register Android/iOS OAuth clients, production signing certificates, and any required consent verification. Never embed a client secret in the app. Use the library’s supported token renewal path, redact credentials from logs, and keep account/permission failures separate from generic network errors.
-
-Backup Settings shows the connected Google account, last successful backup, pending local changes, backup size, automatic backup setting, Back up now, Restore, and Disconnect. Display “Backup needs attention” with a specific recovery action when authentication or upload fails.
-
-### Encryption and recovery
-
-Encrypt archives on the device with an authenticated encryption scheme such as AES-256-GCM through a reviewed native crypto implementation. Generate a random data key and unique nonce per encryption. Store a local key copy in Keychain/Keystore. For another device to restore, also wrap the key using a user recovery passphrase or exported recovery key. A key stored only on the old device cannot protect against device loss while still enabling recovery.
-
-For passphrases, use a reviewed password KDF with a random salt and parameters benchmarked on supported phones. Record the KDF version/parameters in the archive. Explain that Google login does not recover a forgotten recovery secret. Never upload a plaintext encryption key next to the archive. An encrypted backup does not by itself encrypt the live SQLite database.
-
-Archive metadata includes format/schema versions, snapshot ID, dataset ID, device ID, timestamp, app version, currency, payload size/checksum, and encryption/KDF parameters. Encrypt financial payload and attachments. Do not include OAuth tokens, biometric secrets, ad consent decisions, or device-specific notification identifiers.
-
-### Upload protocol
-
-1. Capture a consistent local snapshot and its local revision watermark.
-2. Validate, compress, encrypt, and checksum it in app-private temporary storage.
-3. Upload a new immutable snapshot to Drive appDataFolder.
-4. Verify remote completion and uploaded bytes/hash before marking success.
-5. Update local backup state only after verification; clear pending changes only through the captured watermark.
-6. Retain a bounded history, for example seven daily plus four weekly recovery points, subject to quota and user deletion settings. Prune only after a new snapshot succeeds.
-
-Debounce changes and attempt upload on foreground/resume and user action. Use platform background work where available, but disclose that OS scheduling can delay backups. Retry transient failures with bounded exponential backoff. Preserve the last good snapshot after failures. Handle Drive quota, token revocation, account switching, no network, and low device storage explicitly.
-
-### Restore protocol
-
-1. List snapshots for the chosen dataset/account with dates and compatibility.
-2. Download into temporary private storage; impose archive size and decompression limits.
-3. Authenticate/decrypt, verify checksums, validate schema/references, and migrate a temporary database.
-4. Show a preview with record counts, covered date range, and backup timestamp.
-5. Explain that MVP restore replaces current data; require explicit confirmation and make a local safety snapshot first.
-6. Pause writes, checkpoint/close the current DB, perform a journaled atomic replacement, reopen, and verify integrity. On failure, recover the original DB.
-7. Rebuild notifications and caches; show the restored dataset and retain a recoverable safety snapshot.
-
-MVP does not merge restored records with current records. Disconnecting Google stops uploads but preserves local data; deleting remote backups is a separate explicit action. Switching Google accounts requires a deliberate dataset/account binding choice. Detect snapshots from another device and warn before enabling uploads to an existing dataset; avoid a “latest backup” pointer that silently discards other devices’ histories.
-
-### Phase 3: actual multi-device sync
-
-Add a durable change log, stable entity IDs, device IDs, per-record revisions, deletion tombstones, idempotent batches, and a durable server-side merge protocol. A sync backend such as an authenticated API with a transactional store is preferable to pretending Drive snapshot replacement is record sync.
-
-Specify and test conflicts: concurrent edits to one transaction, edit-versus-delete, category changes, duplicate recurrence occurrences, and transfer updates. Resolve financial conflicts visibly; do not silently rely on device clocks or last-write-wins. Treat transfers as one aggregate. Encrypt synced payloads with a documented device key-sharing and recovery flow. This is a separate product/security phase.
+Android exports the selected currency ledger using the system document picker. The .xlsx workbook has a readable Transactions sheet and a versioned Walletway Backup sheet containing the complete ledger and receipts. Import validates the workbook and snapshot, previews the records, and confirms replacement before a transactional restore. The active currency must match. Files are not encrypted; there is no cloud scheduler or account connection.
 
 ## 8. Advertising and privacy
 
@@ -263,17 +219,17 @@ Use Google Mobile Ads with test unit IDs during development. Separate Android/iO
 
 Start with a small banner on Home or the transaction list. No interstitials in transaction entry, restore, backup, onboarding, or immediately after saving. A later native placement may be added after measuring usability. Consider an optional paid ad-removal product without restricting core offline finance features.
 
-Publish a privacy policy, accurate App Store privacy labels and Google Play Data Safety declarations, and a consent policy appropriate to release regions. Distinguish device-local finance data, user-enabled Drive backup, and advertising SDK collection. Financial information must not become ad targeting or analytics attributes.
+Publish a privacy policy, accurate App Store privacy labels and Google Play Data Safety declarations, and a consent policy appropriate to release regions. Distinguish device-local finance data, user-selected Excel files, and advertising SDK collection. Financial information must not become ad targeting or analytics attributes.
 
 ## 9. Security, permissions, and exports
 
 - Optional biometric/app lock uses native authentication; an app lock alone is not database encryption.
 - Keep files in app-private storage and secrets in secure storage. Decide explicitly whether OS device backups can include the database; avoid unplanned cloud copies.
 - Redact transaction data, tokens, passphrases, and notes from crash logs. Analytics, if added, record coarse UI events only with a documented preference.
-- Request notifications when enabling reminders, photo access when attaching receipts, and Google access when enabling backup.
-- Provide local encrypted backup export/import even without Google. CSV exports are plaintext: explain this at export, use system share/save UI, and remove temporary files promptly.
+- Request notifications when enabling reminders, photo access when attaching receipts.
+- Provide Excel backup export/import. CSV exports are plaintext: explain this at export, use system share/save UI, and remove temporary files promptly.
 - Neutralize spreadsheet formula injection in CSV text fields and validate imported types, currencies, duplicates, sizes, and references before writing.
-- Provide Delete local data and Delete Google backups as distinct actions with explicit consequences.
+- Confirm Delete local data before clearing the active ledger.
 - Assess screen capture/privacy-screen behavior per platform without promising universal screenshot blocking.
 
 ## 10. Reliability, performance, and testing
@@ -299,7 +255,7 @@ CI runs type checks, lint, domain/repository tests, migration tests, and critica
 1. **Foundation:** native project, TypeScript, navigation, design tokens, SQLite schema, migration runner, exact money/date utilities.
 2. **Core ledger:** accounts/categories, expense/income/refund entry, atomic transfers, history, search, daily notes.
 3. **Insights:** dashboard, consistent filters, calendar, charts, accessible report tables, monthly budgets.
-4. **Data protection:** local exports, recovery-key UX, encrypted Drive snapshots, restore preview/rollback, failure states.
+4. **Data protection:** Excel exports, restore preview/rollback, failure states.
 5. **Monetization and release:** ad consent, restrained placements, privacy settings, accessibility/performance validation, signed store builds.
 6. **Expansion:** recurring bills, savings goals, debts, receipts, reports, advanced budgets, and eventually device sync.
 
@@ -311,14 +267,14 @@ CI runs type checks, lint, domain/repository tests, migration tests, and critica
 - Filtered chart totals match the filtered transaction list.
 - Editing, deleting, or undoing a transaction updates all affected views consistently.
 - Monthly budgets show correct progress and never duplicate threshold notifications.
-- A user can export locally and restore a compatible encrypted backup on a fresh installation with the recovery secret.
-- Google backup verifies a new snapshot before showing success; failures preserve prior recovery points.
+- A user can export locally and restore a compatible Excel backup on a fresh installation.
+- Import validates the workbook and snapshot before replacing the selected ledger.
 - Restore previews the replacement and preserves the existing database if validation or replacement fails.
 - Airplane mode supports all core ledger, calendar, budget, and reporting workflows.
 - Advertising does not interrupt money entry or recovery and receives no financial payloads.
 
 ## 12. Decisions to confirm before implementation
 
-Default assumptions: Android and iOS, single personal ledger, one currency in MVP, five-tab navigation, free app with restrained ads, optional Google Drive backup, explicit restore, and no bank integrations.
+Default assumptions: Android and iOS, single personal ledger, one currency in MVP, five-tab navigation, free app with restrained ads, optional Excel backup, explicit restore, and no bank integrations.
 
 Confirm the release market and initial languages, minimum supported OS versions, default currency, brand/name/icon, database-at-rest encryption requirement, and recovery-secret UX. Decide whether paid ad removal belongs in the first release. If seamless simultaneous device editing is required at launch, promote the sync phase into MVP and budget for its backend and conflict workflows.
