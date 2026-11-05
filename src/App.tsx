@@ -5,6 +5,7 @@ import {setMoneyLocale} from './domain.cjs';
 import React,{useState,useEffect,useRef} from 'react';
 import {View,Text,SafeAreaView,StatusBar,Pressable,ActivityIndicator,Alert,BackHandler,Platform,AppState,useColorScheme} from 'react-native';
 import {AppContext} from './context';
+import type {ExcelDraft} from './context';
 import {C,s,applyTheme,Header,Icon,Sheet,Btn} from './ui';
 import {TransactionForm} from './forms';
 import {Home,Transactions,Statistics,Calendar,More,Accounts,Budgets,Goals,BackupScreen,Settings,Categories,Appearance,Onboarding} from './screens';
@@ -13,6 +14,7 @@ import type {Ledger,Transaction} from './models';
 const tabs=[['Home','home'],['Transactions','list'],['Calendar','calendar'],['Statistics','chart'],['More','dots']];
 export default function App(){
  const systemTheme=useColorScheme();const [locked,setLocked]=useState(false);const ledgerRef=useRef<Ledger|null>(null);const initialized=useRef(false);const loading=useRef(false);
+ const [excelDraft,setExcelDraft]=useState<ExcelDraft|null>(null);
  const [draggingCategory,setDraggingCategory]=useState(false);
  const [ledger,setLedger]=useState<Ledger|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const busyRef=useRef(false);const [tab,setTab]=useState('Home');const [subpage,setSubpage]=useState('');const [form,setForm]=useState(false);const [editing,setEditing]=useState<Transaction|undefined>();const [undo,setUndo]=useState<Transaction|null>(null);
  async function initialize(){if(loading.current)return;loading.current=true;setError('');try{await Store.openStore();await Store.processRecurring();const loaded=await Store.loadLedger();setLedger(loaded);if(!initialized.current){setLocked(!!loaded.settings.appLock);initialized.current=true;}}catch(e){setError(e instanceof Error?e.message:'Could not open your data.');}finally{loading.current=false;}}
@@ -35,7 +37,7 @@ export default function App(){
  const current=subpage||tab;
  const screen=({'Guide':Guide,'Home':Home,'Transactions':Transactions,'Calendar':Calendar,'Statistics':Statistics,'More':More,'Accounts':Accounts,'Budgets':Budgets,'Savings goals':Goals,'Backup & restore':BackupScreen,'Settings':Settings,'Categories':Categories,'Appearance':Appearance,'Templates':Templates,'Recurring entries':Recurring,'Debts':Debts} as Record<string,React.ComponentType>)[current]||Home;
  const Screen=screen;
- return <AppContext.Provider value={{ledger,busy,act,add,edit,page,undo:setUndo}}><SafeAreaView style={base}><StatusBar backgroundColor={C.bg} barStyle={mode==='dark'?'light-content':'dark-content'}/>{ledger.settings.onboarding?<>
+ return <AppContext.Provider value={{ledger,busy,act,add,edit,page,undo:setUndo,excelDraft,setExcelDraft}}><SafeAreaView style={base}><StatusBar backgroundColor={C.bg} barStyle={mode==='dark'?'light-content':'dark-content'}/>{ledger.settings.onboarding?<>
  <Header title={current==='Home'?'Walletway':current} subtitle={current==='Home'?'Money Management':current==='Statistics'?'A clearer view of your money':undefined} onBack={subpage?()=>setSubpage(''):undefined} right={<Pressable accessibilityLabel="Add transaction" onPress={add} style={[s.iconBox,{backgroundColor:C.teal}]}><Icon name="plus" color="white"/></Pressable>}/>
  <View style={{flex:1}}><Screen key={ledger.settings.datasetId}/></View>
  {undo&&<View style={[s.row,{backgroundColor:'#18243A',paddingHorizontal:20,paddingVertical:14}]}><Text style={{color:'white',fontSize:13}}>Transaction deleted</Text><Pressable onPress={async()=>{const t=undo;if(await act(()=>Store.undoTransaction(t)))setUndo(null);}} accessibilityRole="button" hitSlop={12}><Text style={{color:'#6FDDD2',fontWeight:'800'}}>Undo</Text></Pressable></View>}

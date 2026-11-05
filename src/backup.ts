@@ -15,7 +15,12 @@ export async function importExcel():Promise<Snapshot|null>{
  const text=await NativeModules.LocalFeatures.openExcelBackup();
  if(text===null)return null;
  if(typeof text!=='string'||text.length>MAX_BYTES)throw new Error('Backup exceeds the import size limit.');
- try{return validateSnapshot(JSON.parse(text));}
+ try{
+  const file:Snapshot=validateSnapshot(JSON.parse(text));
+  if(typeof file.createdAt!=='string'||!Number.isFinite(Date.parse(file.createdAt))||
+     typeof file.data.settings.datasetId!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(file.data.settings.datasetId))throw new Error('Invalid backup metadata.');
+  return file;
+ }
  catch{throw new Error('The Walletway backup is damaged or requires a newer version. No data was changed.');}
 }
 export async function safetySnapshot(){const backup=await snapshot();const path=`${RNFS.DocumentDirectoryPath}/pre-restore-${backup.data.settings.datasetId}-${Date.now()}.json`;await RNFS.writeFile(path,JSON.stringify(backup),'utf8');return path;}
